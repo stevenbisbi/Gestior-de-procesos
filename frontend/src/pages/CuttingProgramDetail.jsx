@@ -1,0 +1,441 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { CuttingPrograms, CuttingLines } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { BackLink, Alert, Loading } from '../components/Common';
+import ProductPicker from '../components/ProductPicker';
+
+const STATUS_PROGRAM = {
+  draft:  { cls: 'bg-slate-100 text-slate-600 border-slate-300',  label: 'Borrador' },
+  active: { cls: 'bg-green-100 text-green-700 border-green-300',  label: 'Activo'   },
+  closed: { cls: 'bg-gray-100  text-gray-500  border-gray-300',   label: 'Cerrado'  },
+};
+
+const BATCH_STATUS = {
+  in_basket:  { cls: 'bg-blue-100  text-blue-700',  label: 'En canasta'  },
+  in_process: { cls: 'bg-amber-100 text-amber-700', label: 'En proceso'  },
+  finished:   { cls: 'bg-green-100 text-green-700', label: 'Terminado'   },
+  dispatched: { cls: 'bg-gray-100  text-gray-500',  label: 'Despachado'  },
+};
+
+// ── Componentes auxiliares (definidos fuera del form para no perder el foco) ─
+const inpCls = 'border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400';
+const selCls = inpCls + ' bg-white';
+
+const Field = ({ label, children, hint }) => (
+  <label className="flex flex-col gap-1">
+    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</span>
+    {children}
+    {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
+  </label>
+);
+
+const Section = ({ title, children }) => (
+  <div className="border-t border-slate-200 pt-3 mt-3 first:border-t-0 first:pt-0 first:mt-0">
+    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">{title}</p>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{children}</div>
+  </div>
+);
+
+// ── Formulario inline para agregar / editar una línea ───────────────────────
+function LineForm({ program, onSave, onCancel, initial }) {
+  const empty = {
+    program: program.id,
+    product_type: '', start_day: '', end_day: '',
+    pieces_per_hour: '', item_code: '', tube_description: '',
+    pedido_quantity: '', total_quantity: '', demo_pieces: '0',
+    tube_count: '', tube_length_mm: '',
+    saw_type: 'hss', saw_teeth: '', rpm: '',
+    advance_high: '', advance_low: '',
+    client: '', packaging: '', notes: '',
+  };
+  const [form, setForm] = useState(initial ? { ...empty, ...initial } : empty);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Recibe (id, producto) desde el ProductPicker — autorrellena del producto
+  const handleProductChange = (pid, p) => {
+    if (!p) { set('product_type', pid); return; }
+    setForm(f => ({
+      ...f,
+      product_type: pid,
+      client:           f.client            || p.client,
+      rpm:              f.rpm               || p.rpm,
+      saw_type:         f.saw_type !== 'hss' ? f.saw_type : (p.saw_type !== 'none' ? p.saw_type : f.saw_type),
+      tube_description: f.tube_description  || `${p.tube_spec_data?.label || ''} x ${p.cut_length}mm`,
+    }));
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true); setErr('');
+    const num = (v) => v === '' || v === null ? null : Number(v);
+    try {
+      const payload = {
+        ...form,
+        start_day:       Number(form.start_day),
+        end_day:         Number(form.end_day),
+        pedido_quantity: Number(form.pedido_quantity),
+        total_quantity:  Number(form.total_quantity),
+        demo_pieces:     Number(form.demo_pieces) || 0,
+        tube_count:      num(form.tube_count),
+        tube_length_mm:  num(form.tube_length_mm),
+        pieces_per_hour: num(form.pieces_per_hour),
+        saw_teeth:       num(form.saw_teeth),
+        rpm:             num(form.rpm),
+        advance_high:    num(form.advance_high),
+        advance_low:     num(form.advance_low),
+      };
+      if (initial?.id) await CuttingLines.update(initial.id, payload);
+      else             await CuttingLines.create(payload);
+      onSave();
+    } catch (e) { setErr(e.message); }
+    finally     { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={submit} className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-3">
+      <p className="text-sm font-semibold text-slate-700 mb-4">
+        {initial?.id ? '✏️ Editar línea' : '➕ Nueva línea'}
+      </p>
+      {err && <Alert type="error" onClose={() => setErr('')}>{err}</Alert>}
+
+      <Section title="Producto y cliente">
+        <div className="col-span-2 sm:col-span-4 flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Producto</span>
+          <ProductPicker value={form.product_type} onChange={handleProductChange}/>
+          <span className="text-[10px] text-slate-400">Busca en el histórico o crea uno nuevo si no existe.</span>
+        </div>
+        <Field label="Item (código)"><input className={inpCls} value={form.item_code} onChange={e=>set('item_code',e.target.value)}/></Field>
+        <Field label="Cliente"><input className={inpCls} required value={form.client} onChange={e=>set('client',e.target.value)}/></Field>
+        <Field label="Embalaje"><input className={inpCls} value={form.packaging} onChange={e=>set('packaging',e.target.value)}/></Field>
+        <label className="col-span-2 sm:col-span-4 flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Descripción tramo cortado</span>
+          <input className={inpCls} required value={form.tube_description}
+            onChange={e=>set('tube_description',e.target.value)}
+            placeholder="TUB CR REDONDO 1 1/2 x 0.80 x 140 mm"/>
+          <span className="text-[10px] text-slate-400">La medida final (mm) va al final del nombre — ej. "...x 140 mm"</span>
+        </label>
+      </Section>
+
+      <Section title="Programación y cantidades">
+        <Field label="Día inicio"><input className={inpCls} type="number" min="1" max="31" required value={form.start_day} onChange={e=>set('start_day',e.target.value)}/></Field>
+        <Field label="Día final"><input className={inpCls} type="number" min="1" max="31" required value={form.end_day}   onChange={e=>set('end_day',  e.target.value)}/></Field>
+        <Field label="Cant. pedida" hint="Lo que pide el cliente">
+          <input className={inpCls} type="number" min="1" required value={form.pedido_quantity} onChange={e=>set('pedido_quantity',e.target.value)}/>
+        </Field>
+        <Field label="Total a cortar" hint="Incluyendo demos / sobrantes">
+          <input className={inpCls} type="number" min="1" required value={form.total_quantity} onChange={e=>set('total_quantity',e.target.value)}/>
+        </Field>
+        <Field label="Piezas demo"><input className={inpCls} type="number" min="0" value={form.demo_pieces} onChange={e=>set('demo_pieces',e.target.value)}/></Field>
+        <Field label="Piezas/hora"><input className={inpCls} type="number" value={form.pieces_per_hour} onChange={e=>set('pieces_per_hour',e.target.value)}/></Field>
+      </Section>
+
+      <Section title="Tubo largo (materia prima)">
+        <Field label="Tramos tubo" hint="Cantidad de tubos largos">
+          <input className={inpCls} type="number" min="0" value={form.tube_count} onChange={e=>set('tube_count',e.target.value)}/>
+        </Field>
+        <Field label="Tubo largo (mm)" hint="Longitud de cada tubo">
+          <input className={inpCls} type="number" step="0.1" value={form.tube_length_mm} onChange={e=>set('tube_length_mm',e.target.value)}/>
+        </Field>
+      </Section>
+
+      <Section title="Sierra y velocidades">
+        <Field label="Tipo de sierra">
+          <select className={selCls} value={form.saw_type} onChange={e=>set('saw_type',e.target.value)}>
+            <option value="hss">HSS</option>
+            <option value="tct">TCT</option>
+          </select>
+        </Field>
+        <Field label="Número de dientes"><input className={inpCls} type="number" min="0" value={form.saw_teeth} onChange={e=>set('saw_teeth',e.target.value)}/></Field>
+        <Field label="RPM"><input className={inpCls} type="number" value={form.rpm} onChange={e=>set('rpm',e.target.value)}/></Field>
+        <div />
+        <Field label="Avance HIGH" hint="Velocidad disponible en High">
+          <input className={inpCls} type="number" step="0.01" value={form.advance_high} onChange={e=>set('advance_high',e.target.value)}/>
+        </Field>
+        <Field label="Avance LOW" hint="Velocidad disponible en Low">
+          <input className={inpCls} type="number" step="0.01" value={form.advance_low} onChange={e=>set('advance_low',e.target.value)}/>
+        </Field>
+      </Section>
+
+      <div className="flex gap-2 mt-5 pt-4 border-t border-slate-200">
+        <button type="submit" disabled={saving} className="btn btn-primary px-5">
+          {saving ? 'Guardando…' : initial?.id ? 'Guardar cambios' : 'Agregar línea'}
+        </button>
+        <button type="button" onClick={onCancel} className="btn btn-outline px-5">Cancelar</button>
+      </div>
+    </form>
+  );
+}
+
+// ── Fila de línea del programa ───────────────────────────────────────────────
+function ProgramLineRow({ line, isSupervisor, onEdit, onDelete }) {
+  const bs = BATCH_STATUS[line.batch_status] || {};
+  return (
+    <tr className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+      {/* Días */}
+      <td className="py-3 px-3 text-sm text-slate-600 whitespace-nowrap">
+        {line.start_day} – {line.end_day}
+      </td>
+      {/* Producto / tubo */}
+      <td className="py-3 px-3">
+        <div className="font-medium text-sm text-slate-800">{line.product_type_data?.name}</div>
+        <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[260px]">{line.tube_description}</div>
+        {line.client && <div className="text-xs text-blue-500 mt-0.5">{line.client}</div>}
+      </td>
+      {/* Cantidades */}
+      <td className="py-3 px-3 text-center">
+        <div className="text-sm font-semibold text-slate-800">{line.pedido_quantity?.toLocaleString()}</div>
+        <div className="text-[10px] text-slate-400">pedido</div>
+        <div className="text-xs text-slate-500 mt-1">→ {line.total_quantity?.toLocaleString()}</div>
+        <div className="text-[10px] text-slate-400">a cortar</div>
+        {line.pieces_per_hour && <div className="text-[10px] text-slate-400 mt-1">{line.pieces_per_hour} pz/h</div>}
+      </td>
+      {/* Tubo largo */}
+      <td className="py-3 px-3 text-center text-xs text-slate-600">
+        {line.tube_count ? <div><strong>{line.tube_count}</strong> ud</div> : <span className="text-slate-300">—</span>}
+        {line.tube_length_mm && <div className="text-slate-400">{line.tube_length_mm} mm</div>}
+      </td>
+      {/* Sierra */}
+      <td className="py-3 px-3">
+        <div className="flex flex-wrap gap-1">
+          <span className="px-2 py-0.5 rounded text-xs font-mono font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            {line.saw_type_display}
+          </span>
+          {line.saw_teeth && (
+            <span className="px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-600">
+              {line.saw_teeth} dientes
+            </span>
+          )}
+          {line.rpm && (
+            <span className="px-2 py-0.5 rounded text-xs font-mono bg-amber-50 text-amber-700 border border-amber-200">
+              {line.rpm} RPM
+            </span>
+          )}
+        </div>
+      </td>
+      {/* Avance High / Low */}
+      <td className="py-3 px-3 text-center">
+        <div className="flex flex-col gap-0.5 text-xs font-mono">
+          {line.advance_high != null && (
+            <span><span className="text-slate-400">High</span> <strong className="text-slate-700">{line.advance_high}</strong></span>
+          )}
+          {line.advance_low != null && (
+            <span><span className="text-slate-400">Low</span> <strong className="text-slate-700">{line.advance_low}</strong></span>
+          )}
+          {line.advance_high == null && line.advance_low == null && <span className="text-slate-300">—</span>}
+        </div>
+      </td>
+      {/* Lote */}
+      <td className="py-3 px-3 text-center">
+        {line.batch_id ? (
+          <div className="flex flex-col items-center gap-1">
+            <Link to={`/lote/${line.batch_id}`}
+              className="text-xs font-mono text-blue-600 hover:underline">
+              {line.batch_code}
+            </Link>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bs.cls}`}>
+              {bs.label}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400">—</span>
+        )}
+      </td>
+      {/* Acciones supervisor */}
+      {isSupervisor && (
+        <td className="py-3 px-3 text-center">
+          <div className="flex gap-1 justify-center">
+            <button onClick={() => onEdit(line)}
+              className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
+              ✏️
+            </button>
+            {(!line.batch_status || line.batch_status === 'in_basket') && (
+              <button onClick={() => onDelete(line)}
+                className="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-500 transition">
+                🗑
+              </button>
+            )}
+          </div>
+        </td>
+      )}
+    </tr>
+  );
+}
+
+// ── Página principal ─────────────────────────────────────────────────────────
+export default function CuttingProgramDetail() {
+  const { id }         = useParams();
+  const navigate       = useNavigate();
+  const { user }       = useAuth();
+  const isSupervisor   = user?.is_supervisor;
+
+  const [program,   setProgram]   = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [err,       setErr]       = useState('');
+  const [showForm,  setShowForm]  = useState(false);
+  const [editLine,  setEditLine]  = useState(null);
+  const [acting,    setActing]    = useState(false);
+
+  const load = async () => {
+    try {
+      setProgram(await CuttingPrograms.get(id));
+    } catch (e) { setErr(e.message); }
+    finally     { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [id]);
+
+  const handleActivate = async () => {
+    if (!confirm('¿Activar este programa? El programa activo actual quedará cerrado.')) return;
+    setActing(true);
+    try { await CuttingPrograms.activate(id); await load(); }
+    catch(e) { setErr(e.message); }
+    finally  { setActing(false); }
+  };
+
+  const handleClose = async () => {
+    if (!confirm('¿Cerrar este programa?')) return;
+    setActing(true);
+    try { await CuttingPrograms.close(id); await load(); }
+    catch(e) { setErr(e.message); }
+    finally  { setActing(false); }
+  };
+
+  const handleDelete = async (line) => {
+    if (!confirm(`¿Eliminar línea #${line.order}?`)) return;
+    try { await CuttingLines.delete(line.id); await load(); }
+    catch(e) { setErr(e.message); }
+  };
+
+  const handleSaved = () => {
+    setShowForm(false);
+    setEditLine(null);
+    load();
+  };
+
+  if (loading) return <Loading />;
+  if (!program) return <div className="text-center text-slate-500 mt-20">{err || 'Programa no encontrado'}</div>;
+
+  const ps = STATUS_PROGRAM[program.status] || {};
+
+  return (
+    <div className="space-y-5">
+      {/* Cabecera */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <BackLink to="/programa" label="Programas de corte" />
+          <div className="flex items-center gap-3 mt-2">
+            <h1 className="text-2xl font-bold text-slate-800">
+              ✂️ {program.month_display}
+              <span className="text-base font-normal text-slate-400 ml-2">v{program.version}</span>
+            </h1>
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${ps.cls}`}>
+              {ps.label}
+            </span>
+          </div>
+          <p className="text-sm text-slate-400 mt-1">
+            Cortadora Bewo · {program.lines?.length || 0} líneas ·{' '}
+            {program.lines?.reduce((s,l) => s + l.total_quantity, 0).toLocaleString()} piezas totales
+          </p>
+        </div>
+
+        {/* Acciones supervisor */}
+        {isSupervisor && (
+          <div className="flex gap-2 flex-wrap">
+            {program.status === 'draft' && (
+              <button onClick={handleActivate} disabled={acting}
+                className="btn btn-primary px-4">
+                ✅ Activar programa
+              </button>
+            )}
+            {program.status === 'active' && (
+              <button onClick={handleClose} disabled={acting}
+                className="btn btn-outline px-4 text-slate-600">
+                🔒 Cerrar programa
+              </button>
+            )}
+            {program.status !== 'closed' && (
+              <button onClick={() => { setEditLine(null); setShowForm(v => !v); }}
+                className="btn btn-outline px-4">
+                {showForm ? 'Cancelar' : '➕ Nueva línea'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {err && <Alert type="error" onClose={() => setErr('')}>{err}</Alert>}
+
+      {/* Formulario nueva línea */}
+      {showForm && !editLine && (
+        <LineForm
+          program={program}
+          onSave={handleSaved}
+          onCancel={() => setShowForm(false)}
+        />
+      )}
+
+      {/* Tabla de líneas */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        {program.lines?.length === 0 ? (
+          <div className="text-center py-16 text-slate-400">
+            <div className="text-4xl mb-3">📋</div>
+            <p>Sin líneas en este programa.</p>
+            {isSupervisor && <p className="text-sm mt-1">Usa "Nueva línea" para agregar renglones.</p>}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="py-3 px-3 text-left whitespace-nowrap">Días</th>
+                  <th className="py-3 px-3 text-left">Producto / Tubo</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">Cantidades</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">Tubo largo</th>
+                  <th className="py-3 px-3 text-left whitespace-nowrap">Sierra</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">Avance</th>
+                  <th className="py-3 px-3 text-center">Lote</th>
+                  {isSupervisor && <th className="py-3 px-3 text-center w-20">Acciones</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {program.lines.map(line => (
+                  editLine?.id === line.id ? (
+                    <tr key={line.id}>
+                      <td colSpan={isSupervisor ? 8 : 7} className="px-3 py-2">
+                        <LineForm
+                          program={program}
+                          initial={editLine}
+                          onSave={handleSaved}
+                          onCancel={() => setEditLine(null)}
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    <ProgramLineRow
+                      key={line.id}
+                      line={line}
+                      isSupervisor={isSupervisor}
+                      onEdit={l => { setShowForm(false); setEditLine(l); }}
+                      onDelete={handleDelete}
+                    />
+                  )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Notas del programa */}
+      {program.notes && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <span className="font-semibold">Notas:</span> {program.notes}
+        </div>
+      )}
+    </div>
+  );
+}

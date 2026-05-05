@@ -59,13 +59,17 @@ export const Records = {
 };
 
 export const Catalog = {
-  products: () => api.get('/product-types/'),
-  machines: () => api.get('/machines/'),
+  products:       ()      => api.get('/product-types/'),
+  createProduct:  (data)  => api.post('/product-types/', data),
+  machines:       ()      => api.get('/machines/'),
+  tubes:          ()      => api.get('/tube-specs/'),
+  createTube:     (data)  => api.post('/tube-specs/', data),
 };
 
 export const Dashboard = {
-  supervisor:    () => api.get('/supervisor/dashboard/'),
-  operatorTasks: () => api.get('/operator/tasks/'),
+  supervisor:     () => api.get('/supervisor/dashboard/'),
+  machinesStatus: () => api.get('/supervisor/machines/'),
+  operatorTasks:  () => api.get('/operator/tasks/'),
 };
 
 export const Quality = {
@@ -80,4 +84,20 @@ export const Quality = {
 export const DimLogs = {
   byRecord: (rid) => api.get(`/quality/logs/?record=${rid}`),
   create:   (data)=> api.post('/quality/logs/', data),
+};
+
+export const CuttingPrograms = {
+  list:    ()        => api.get('/cutting-programs/'),
+  get:     (id)      => api.get(`/cutting-programs/${id}/`),
+  active:  ()        => api.get('/cutting-programs/active/'),
+  create:  (data)    => api.post('/cutting-programs/', data),
+  update:  (id,data) => api.patch(`/cutting-programs/${id}/`, data),
+  activate:(id)      => api.post(`/cutting-programs/${id}/activate/`),
+  close:   (id)      => api.post(`/cutting-programs/${id}/close/`),
+};
+
+export const CuttingLines = {
+  create:  (data)    => api.post('/cutting-lines/', data),
+  update:  (id,data) => api.patch(`/cutting-lines/${id}/`, data),
+  delete:  (id)      => api.delete(`/cutting-lines/${id}/`),
 };

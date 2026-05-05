@@ -30,11 +30,13 @@ export function MiniPipeline({ records }) {
   return (
     <div className="flex items-center gap-1 mt-1">
       {records.map((r, i) => (
-        <div key={r.process_type || i} className="flex items-center gap-1">
+        <div key={r.process_type || i} className="flex items-center gap-1"
+             title={`${r.process_type}: ${r.qty_done ?? 0}/${r.qty_assigned ?? 0}`}>
           {i > 0 && <div className={`w-3.5 h-0.5 ${r.status === 'finished' ? 'bg-emerald-500' : 'bg-slate-200'}`} />}
           <div className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center
-            ${r.status === 'finished' ? 'bg-emerald-500 text-white' :
-              r.status === 'in_process' ? 'bg-blue-500 text-white' :
+            ${r.status === 'finished'   ? 'bg-emerald-500 text-white' :
+              r.status === 'in_process' ? 'bg-amber-500 text-white' :
+              r.status === 'paused'     ? 'bg-blue-500 text-white' :
               'bg-slate-200 text-slate-400'}`}>
             {r.status === 'finished' ? '✓' :
               (r.process_type === 'corte' ? '✂' :
@@ -49,9 +51,10 @@ export function MiniPipeline({ records }) {
 
 /** Card de lote — usado en listas */
 export function BatchCard({ batch, to }) {
-  const tubeLabel = batch.tube_label || (batch.product_type_data?.tube_spec_data?.label);
+  const tubeLabel   = batch.tube_label   || batch.product_type_data?.tube_spec_data?.label;
   const productName = batch.product_name || batch.product_type_data?.name;
-  const cutLength = batch.cut_length || batch.product_type_data?.cut_length;
+  const cutLength   = batch.cut_length   || batch.product_type_data?.cut_length;
+  const cp          = batch.current_process;
 
   return (
     <Link to={to} className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center gap-3 hover:shadow-md hover:border-blue-300 transition">
@@ -68,6 +71,14 @@ export function BatchCard({ batch, to }) {
           {tubeLabel} · Corte: {cutLength?.toFixed?.(0) ?? cutLength} mm · {batch.total_quantity} uds
         </div>
         {batch.process_route?.length > 0 && <MiniPipeline records={batch.process_route} />}
+        {/* Detalle del proceso actual (con avance parcial) */}
+        {cp && cp.qty_done > 0 && cp.qty_done < cp.qty_assigned && (
+          <div className="text-[11px] text-blue-600 mt-1 font-medium">
+            {cp.label}: <strong>{cp.qty_done}</strong>/{cp.qty_assigned}
+            {cp.status === 'paused' && ' · ⏸ pausado'}
+            {cp.status === 'in_process' && ' · 🔄 activo'}
+          </div>
+        )}
       </div>
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
         <PriorityTag priority={batch.priority} />
