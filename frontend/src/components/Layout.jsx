@@ -3,9 +3,16 @@ import { useAuth } from '../lib/auth';
 
 const TabsSupervisor = [
   { to: '/supervisor',     label: 'Resumen',    icon: '📊' },
+  { to: '/maquinas',       label: 'Máquinas',   icon: '🏭' },
   { to: '/lotes',          label: 'Lotes',      icon: '📦' },
-  { to: '/nuevo-lote',     label: 'Nuevo lote', icon: '➕' },
+  { to: '/programa',       label: 'Programa',   icon: '✂️' },
   { to: '/calidad/reporte',label: 'Calidad',    icon: '✓'  },
+];
+
+// Para operarios de corte (Bewo) se muestra la tab de programa
+const TabsOperatorCorte = [
+  { to: '/operario',       label: 'Mis tareas', icon: '🛠' },
+  { to: '/corte/programa', label: 'Programa',   icon: '✂️' },
 ];
 
 const TabsOperator = [
@@ -15,7 +22,10 @@ const TabsOperator = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const loc = useLocation();
-  const tabs = user.is_supervisor ? TabsSupervisor : TabsOperator;
+  const isBewoOperator = !user.is_supervisor && user.process_types?.includes('corte');
+  const tabs = user.is_supervisor
+    ? TabsSupervisor
+    : isBewoOperator ? TabsOperatorCorte : TabsOperator;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100">

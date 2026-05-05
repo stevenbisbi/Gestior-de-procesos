@@ -8,28 +8,35 @@ import SignaturePad from '../components/SignaturePad';
 
 export default function ProcessFinish() {
   const { id } = useParams();
-  const nav = useNavigate();
+  const nav    = useNavigate();
   const { user } = useAuth();
-  const [record, setRecord] = useState(null);
-  const [qtyDone, setQtyDone] = useState('');
-  const [shift, setShift] = useState('');
-  const [notes, setNotes] = useState('');
+
+  const [record, setRecord]       = useState(null);
+  const [qtyDone, setQtyDone]     = useState('');
+  const [shift, setShift]         = useState('');
+  const [notes, setNotes]         = useState('');
   const [signature, setSignature] = useState('');
-  const [elapsed, setElapsed] = useState('—');
-  const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [elapsed, setElapsed]     = useState('—');
+  const [error, setError]         = useState(null);
+  const [saving, setSaving]       = useState(false);
 
   useEffect(() => {
     Records.get(id).then(r => {
       setRecord(r);
-      setQtyDone(r.qty_assigned);
+      // Por defecto: lo que falta (si es poco) o vacío para que el operario lo escriba
+      const remaining = r.qty_remaining ?? (r.qty_assigned - r.qty_done);
+      setQtyDone(remaining > 0 ? remaining : 1);
       setShift(r.shift || '');
     });
   }, [id]);
 
+  // Cronómetro del turno actual
   useEffect(() => {
-    if (!record?.started_at) return;
-    const start = new Date(record.started_at).getTime();
+    if (!record) return;
+    const activeShift = record.shift_entries?.find(s => !s.finished_at);
+    const startStr = activeShift?.started_at || record.started_at;
+    if (!startStr) return;
+    const start = new Date(startStr).getTime();
     const t = setInterval(() => {
       const diff = Date.now() - start;
       const h = Math.floor(diff / 3600000);
@@ -38,16 +45,20 @@ export default function ProcessFinish() {
       setElapsed(`${h > 0 ? h + 'h ' : ''}${m}min ${s}s`);
     }, 1000);
     return () => clearInterval(t);
-  }, [record?.started_at]);
+  }, [record]);
 
   if (!record) return <Loading />;
+
+  const remaining   = record.qty_remaining ?? (record.qty_assigned - record.qty_done);
+  const willFinish  = Number(qtyDone) >= remaining;
+  const numericQty  = Math.max(1, Math.min(remaining, parseInt(qtyDone) || 1));
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true); setError(null);
     try {
       await Records.finish(id, {
-        qty_done: parseInt(qtyDone),
+        qty_done:  numericQty,
         signature, notes,
       });
       nav(`/lote/${record.batch}`);
@@ -59,8 +70,9 @@ export default function ProcessFinish() {
   return (
     <div className="max-w-xl">
       <BackLink to={`/lote/${record.batch}`} />
-      {error && <Alert kind="error">{error}</Alert>}
+      {error && <Alert type="error">{error}</Alert>}
 
+      {/* Cabecera del proceso */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 mb-3">
         <ProcIcon type={record.process_type} />
         <div className="flex-1">
@@ -70,24 +82,60 @@ export default function ProcessFinish() {
         <StatusBadge status="in_process" />
       </div>
 
+      {/* Estado de avance del proceso completo */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-3">
+        <div className="flex items-center justify-between text-xs text-blue-900 mb-1.5">
+          <span className="font-semibold uppercase tracking-wide">Avance total del proceso</span>
+          <span className="font-mono">{record.progress_pct}%</span>
+        </div>
+        <div className="grid grid-cols-3 text-center text-sm gap-2 mb-2">
+          <div>
+            <div className="text-xs text-blue-700/70">Asignado</div>
+            <div className="font-bold text-blue-900">{record.qty_assigned.toLocaleString()}</div>
+          </div>
+          <div>
+            <div className="text-xs text-blue-700/70">Hecho hasta ahora</div>
+            <div className="font-bold text-blue-900">{record.qty_done.toLocaleString()}</div>
+          </div>
+          <div>
+            <div className="text-xs text-blue-700/70">Restante</div>
+            <div className="font-bold text-amber-600">{remaining.toLocaleString()}</div>
+          </div>
+        </div>
+        <div className="h-2 bg-white/60 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-600 transition-all" style={{ width: `${record.progress_pct}%` }}/>
+        </div>
+      </div>
+
       <form onSubmit={submit} className="space-y-3">
-        {/* Cantidad */}
+        {/* Cantidad de ESTE turno */}
         <div className="card">
           <div className="card-header">
-            <span className="card-title">Cantidad realizada</span>
-            <span className="text-xs text-slate-400">Máx: {record.qty_assigned} uds</span>
+            <span className="card-title">¿Cuánto hiciste en este turno?</span>
+            <span className="text-xs text-slate-400">Máx: {remaining} uds</span>
           </div>
           <div className="card-body">
             <div className="flex items-center gap-3 border-2 border-slate-200 rounded-lg px-4 py-2 bg-slate-50">
-              <button type="button" onClick={() => setQtyDone(Math.max(1, qtyDone - 1))}
+              <button type="button" onClick={() => setQtyDone(Math.max(1, numericQty - 1))}
                 className="w-8 h-8 rounded-full border bg-white hover:border-blue-500">−</button>
-              <input type="number" min="1" max={record.qty_assigned} value={qtyDone}
-                onChange={e => setQtyDone(Math.min(record.qty_assigned, Math.max(1, parseInt(e.target.value) || 1)))}
+              <input type="number" min="1" max={remaining} value={qtyDone}
+                onChange={e => setQtyDone(e.target.value)}
                 className="flex-1 text-center text-2xl font-mono font-medium bg-transparent outline-none" />
-              <button type="button" onClick={() => setQtyDone(Math.min(record.qty_assigned, qtyDone + 1))}
+              <button type="button" onClick={() => setQtyDone(Math.min(remaining, numericQty + 1))}
                 className="w-8 h-8 rounded-full border bg-white hover:border-blue-500">+</button>
               <span className="text-sm text-slate-600">uds</span>
             </div>
+
+            {/* Indicador del resultado */}
+            {willFinish ? (
+              <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
+                ✅ Con esta cantidad <strong>se completa</strong> el proceso. Quedará marcado como Terminado.
+              </div>
+            ) : (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+                ⏸ Quedarán <strong>{(remaining - numericQty).toLocaleString()} uds</strong> pendientes para que otro operario las termine.
+              </div>
+            )}
           </div>
         </div>
 
@@ -98,13 +146,9 @@ export default function ProcessFinish() {
               <tbody>
                 <tr><td className="py-1 text-slate-600">Proceso</td>
                   <td className="py-1 font-semibold text-right">{record.process_label}</td></tr>
-                <tr><td className="py-1 text-slate-600">Operario</td>
+                <tr><td className="py-1 text-slate-600">Operario (este turno)</td>
                   <td className="py-1 font-semibold text-right">{user.full_name}</td></tr>
-                {record.started_at && (
-                  <tr><td className="py-1 text-slate-600">Inicio</td>
-                    <td className="py-1 text-right font-mono text-xs">{formatDateTime(record.started_at)}</td></tr>
-                )}
-                <tr><td className="py-1 text-slate-600">Tiempo transcurrido</td>
+                <tr><td className="py-1 text-slate-600">Tiempo del turno</td>
                   <td className="py-1 text-right">{elapsed}</td></tr>
                 {record.machine_data && (
                   <tr><td className="py-1 text-slate-600">Máquina</td>
@@ -115,7 +159,7 @@ export default function ProcessFinish() {
           </div>
         </div>
 
-        {/* Turno + Notes */}
+        {/* Turno + Notas */}
         <div className="card">
           <div className="card-body space-y-3">
             <div>
@@ -147,7 +191,7 @@ export default function ProcessFinish() {
         </div>
 
         <button type="submit" disabled={saving} className="btn btn-success btn-full py-4 text-base">
-          {saving ? 'Guardando...' : '✔ CONFIRMAR TÉRMINO'}
+          {saving ? 'Guardando...' : willFinish ? '✔ TERMINAR PROCESO' : '⏸ CERRAR TURNO'}
         </button>
       </form>
     </div>

@@ -19,6 +19,11 @@ import QualityReport from './pages/QualityReport';
 import DimensionalLog from './pages/DimensionalLog';
 import DimensionalAdd from './pages/DimensionalAdd';
 
+import CuttingProgramList     from './pages/CuttingProgramList';
+import CuttingProgramDetail   from './pages/CuttingProgramDetail';
+import CuttingProgramOperator from './pages/CuttingProgramOperator';
+import MachinesStatus         from './pages/MachinesStatus';
+
 function Protected({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
@@ -54,6 +59,12 @@ export default function App() {
         <Route path="/calidad/ver/:rid"    element={<QualityDetail />} />
         <Route path="/dimensional/:rid"        element={<DimensionalLog />} />
         <Route path="/dimensional/:rid/nueva"  element={<DimensionalAdd />} />
+        {/* Programa de corte */}
+        <Route path="/programa"       element={<CuttingProgramList />} />
+        <Route path="/programa/:id"   element={<CuttingProgramDetail />} />
+        <Route path="/corte/programa" element={<CuttingProgramOperator />} />
+        {/* Estado de máquinas */}
+        <Route path="/maquinas"       element={<MachinesStatus />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

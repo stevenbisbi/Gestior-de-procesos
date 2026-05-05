@@ -122,27 +122,141 @@ class ProductionBatch(models.Model):
 
     @property
     def progress_pct(self):
-        total = self.records.count()
-        if total == 0: return 0
-        done = self.records.filter(status='finished').count()
+        """Avance ponderado real: suma de uds hechas en TODOS los procesos / total esperado."""
+        from django.db.models import Sum
+        agg = self.records.aggregate(done=Sum('qty_done'), total=Sum('qty_assigned'))
+        total = agg['total'] or 0
+        done  = agg['done']  or 0
+        if total == 0:
+            return 0
         return int((done / total) * 100)
 
 
+# ─────────────────────────────────────────────
+#  PROGRAMA DE CORTE
+# ─────────────────────────────────────────────
+
+class CuttingProgram(models.Model):
+    STATUS_CHOICES = [
+        ('draft',  'Borrador'),
+        ('active', 'Activo'),
+        ('closed', 'Cerrado'),
+    ]
+    month      = models.DateField(verbose_name='Mes del programa')   # primer día del mes
+    version    = models.IntegerField(default=1)
+    status     = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+    notes      = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='cutting_programs')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-month', '-version']
+
+    def __str__(self):
+        MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+        return f'Programa {MONTHS[self.month.month - 1]} {self.month.year} v{self.version}'
+
+    def activate(self):
+        """Activa este programa y cierra cualquier otro activo."""
+        CuttingProgram.objects.filter(status='active').exclude(pk=self.pk).update(status='closed')
+        self.status = 'active'
+        self.save(update_fields=['status', 'updated_at'])
+
+
+class CuttingProgramLine(models.Model):
+    SAW_CHOICES = [('hss', 'HSS'), ('tct', 'TCT')]
+
+    program      = models.ForeignKey(CuttingProgram, on_delete=models.CASCADE, related_name='lines')
+    batch        = models.OneToOneField(
+        'ProductionBatch', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='program_line',
+    )
+    product_type = models.ForeignKey(
+        ProductType, on_delete=models.PROTECT, related_name='program_lines',
+    )
+
+    # Programación
+    start_day       = models.IntegerField(verbose_name='Día inicio')
+    end_day         = models.IntegerField(verbose_name='Día final')
+    pieces_per_hour = models.FloatField(null=True, blank=True, verbose_name='Piezas/hora')
+
+    # Identificación (tal como aparece en el documento físico)
+    item_code        = models.CharField(max_length=50, blank=True, verbose_name='Item')
+    tube_description = models.CharField(max_length=300, verbose_name='Descripción tramo cortado')
+
+    # Cantidades
+    pedido_quantity = models.IntegerField(verbose_name='Cantidad pedida (cliente)')
+    total_quantity  = models.IntegerField(verbose_name='Total a cortar')
+    demo_pieces     = models.IntegerField(default=0, verbose_name='Piezas demo')
+
+    # Tubo largo (materia prima)
+    tube_count     = models.IntegerField(null=True, blank=True, verbose_name='Tramos tubo (cantidad)')
+    tube_length_mm = models.FloatField(null=True, blank=True, verbose_name='Tubo largo (mm)')
+
+    # Sierra
+    saw_type   = models.CharField(max_length=5, choices=SAW_CHOICES, verbose_name='Tipo sierra')
+    saw_teeth  = models.IntegerField(null=True, blank=True, verbose_name='Número de dientes')
+    rpm        = models.IntegerField(null=True, blank=True, verbose_name='RPM')
+
+    # Avance — agrupa las dos velocidades disponibles para esta pieza
+    advance_high = models.FloatField(null=True, blank=True, verbose_name='Avance High')
+    advance_low  = models.FloatField(null=True, blank=True, verbose_name='Avance Low')
+
+    # Comercial
+    client    = models.CharField(max_length=200, verbose_name='Cliente')
+    packaging = models.CharField(max_length=100, blank=True, verbose_name='Embalaje')
+    notes     = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['program', 'id']
+
+    def __str__(self):
+        return f'{self.program} | {self.product_type.name}'
+
+    def create_batch(self, user):
+        """Crea y asocia el ProductionBatch de este renglón si todavía no existe."""
+        if self.batch:
+            return self.batch
+        from datetime import date
+        day = min(self.start_day, 28)  # evita días inválidos en meses cortos
+        sched = date(self.program.month.year, self.program.month.month, day)
+        batch = ProductionBatch.objects.create(
+            product_type=self.product_type,
+            total_quantity=self.total_quantity,
+            priority=self.product_type.default_priority,
+            scheduled_date=sched,
+            notes=f'Generado desde {self.program}',
+            created_by=user,
+        )
+        batch.create_process_records()
+        self.batch = batch
+        self.save(update_fields=['batch'])
+        return batch
+
+
 class ProcessRecord(models.Model):
-    STATUS_CHOICES = [('pending','Pendiente'),('in_process','En proceso'),('finished','Terminado')]
+    STATUS_CHOICES = [
+        ('pending',    'Pendiente'),
+        ('in_process', 'En proceso'),
+        ('paused',     'Pausado (turno cerrado)'),
+        ('finished',   'Terminado'),
+    ]
     SHIFT_CHOICES = [('A','Turno A (06:00–14:00)'),('B','Turno B (14:00–22:00)'),('C','Turno C (22:00–06:00)')]
 
     batch        = models.ForeignKey(ProductionBatch, on_delete=models.CASCADE, related_name='records')
     process_type = models.CharField(max_length=10)
     sequence     = models.IntegerField(default=1)
+    # Estos campos reflejan el ÚLTIMO turno (legacy / acceso rápido). El detalle real va en shift_entries.
     machine      = models.ForeignKey(Machine, on_delete=models.SET_NULL, null=True, blank=True, related_name='process_records')
     operator     = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='process_records')
     shift        = models.CharField(max_length=1, choices=SHIFT_CHOICES, blank=True)
     status       = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     qty_assigned = models.IntegerField()
-    qty_done     = models.IntegerField(default=0)
-    started_at   = models.DateTimeField(null=True, blank=True)
-    finished_at  = models.DateTimeField(null=True, blank=True)
+    qty_done     = models.IntegerField(default=0)  # acumulado de todos los turnos
+    started_at   = models.DateTimeField(null=True, blank=True)   # primer arranque
+    finished_at  = models.DateTimeField(null=True, blank=True)   # cuando se completó qty_assigned
     signature    = models.TextField(blank=True)
     notes        = models.TextField(blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)
@@ -157,24 +271,109 @@ class ProcessRecord(models.Model):
     def get_process_label(self):
         return PROCESS_LABELS.get(self.process_type, self.process_type.title())
 
-    def start(self, user, machine=None, shift=''):
-        self.status = 'in_process'
-        self.operator = user
-        self.machine = machine
-        self.shift = shift
-        self.started_at = timezone.now()
-        self.save()
-        self.batch.status = 'in_process'
-        self.batch.save(update_fields=['status', 'updated_at'])
+    @property
+    def qty_remaining(self):
+        return max(0, self.qty_assigned - self.qty_done)
 
-    def finish(self, qty_done, user, signature='', notes=''):
-        self.status = 'finished'
-        self.qty_done = qty_done
+    @property
+    def progress_pct(self):
+        if self.qty_assigned == 0:
+            return 0
+        return int((self.qty_done / self.qty_assigned) * 100)
+
+    @property
+    def active_shift(self):
+        """Turno actualmente en curso (sin finished_at), o None."""
+        return self.shift_entries.filter(finished_at__isnull=True).first()
+
+    # ── Operaciones ────────────────────────────────────────
+    def start_shift(self, user, machine=None, shift=''):
+        """Crea un nuevo turno de trabajo. Falla si ya hay uno activo."""
+        from django.core.exceptions import ValidationError
+        if self.status == 'finished':
+            raise ValidationError('Este proceso ya está terminado.')
+        if self.active_shift:
+            raise ValidationError('Ya hay un turno activo en este proceso.')
+
+        entry = ProcessShiftEntry.objects.create(
+            process_record=self,
+            operator=user,
+            machine=machine,
+            shift=shift,
+            started_at=timezone.now(),
+        )
+        # Reflejo en campos legacy
         self.operator = user
-        self.finished_at = timezone.now()
-        self.signature = signature
-        self.notes = notes
-        self.save()
-        if not self.batch.records.exclude(status='finished').exists():
+        self.machine  = machine
+        self.shift    = shift
+        if not self.started_at:
+            self.started_at = entry.started_at
+        self.status = 'in_process'
+        self.save(update_fields=['operator','machine','shift','started_at','status'])
+
+        if self.batch.status == 'in_basket':
+            self.batch.status = 'in_process'
+            self.batch.save(update_fields=['status', 'updated_at'])
+        return entry
+
+    def end_shift(self, qty_done_this_shift, user, signature='', notes=''):
+        """Cierra el turno activo. Si se completó qty_assigned → finished, sino → paused."""
+        from django.core.exceptions import ValidationError
+        from django.db.models import Sum
+        active = self.active_shift
+        if not active:
+            raise ValidationError('No hay un turno activo en este proceso.')
+
+        active.qty_done    = qty_done_this_shift
+        active.finished_at = timezone.now()
+        active.signature   = signature
+        active.notes       = notes
+        active.save()
+
+        # Recalcular acumulado
+        total = self.shift_entries.aggregate(s=Sum('qty_done'))['s'] or 0
+        self.qty_done   = total
+        self.signature  = signature  # firma del último turno (legacy)
+
+        if total >= self.qty_assigned:
+            self.status      = 'finished'
+            self.finished_at = active.finished_at
+        else:
+            self.status = 'paused'   # disponible para otro operario
+
+        self.save(update_fields=['qty_done','signature','status','finished_at'])
+
+        # Si el lote completó todos sus procesos → finished
+        if self.status == 'finished' and not self.batch.records.exclude(status='finished').exists():
             self.batch.status = 'finished'
             self.batch.save(update_fields=['status', 'updated_at'])
+
+        return active
+
+    # ── Compatibilidad con código existente ────────────────
+    def start(self, user, machine=None, shift=''):
+        return self.start_shift(user, machine=machine, shift=shift)
+
+    def finish(self, qty_done, user, signature='', notes=''):
+        return self.end_shift(qty_done, user=user, signature=signature, notes=notes)
+
+
+class ProcessShiftEntry(models.Model):
+    """Cada vez que un operario abre un turno y lo cierra dentro de un ProcessRecord."""
+    SHIFT_CHOICES = ProcessRecord.SHIFT_CHOICES
+
+    process_record = models.ForeignKey(ProcessRecord, on_delete=models.CASCADE, related_name='shift_entries')
+    operator       = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='shift_entries')
+    machine        = models.ForeignKey(Machine, on_delete=models.SET_NULL, null=True, blank=True, related_name='shift_entries')
+    shift          = models.CharField(max_length=1, choices=SHIFT_CHOICES, blank=True)
+    qty_done       = models.IntegerField(default=0)
+    started_at     = models.DateTimeField()
+    finished_at    = models.DateTimeField(null=True, blank=True)
+    signature      = models.TextField(blank=True)
+    notes          = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['process_record', 'started_at']
+
+    def __str__(self):
+        return f'{self.process_record} | {self.operator} ({self.qty_done})'

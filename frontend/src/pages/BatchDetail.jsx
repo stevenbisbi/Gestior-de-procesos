@@ -32,7 +32,7 @@ export default function BatchDetail() {
 
   // Determine which actions can the user do per process
   const canStart  = (rec) => user.process_types?.includes(rec.process_type)
-                          && rec.status === 'pending';
+                          && (rec.status === 'pending' || rec.status === 'paused');
   const canFinish = (rec) => user.process_types?.includes(rec.process_type)
                           && rec.status === 'in_process';
 
@@ -122,54 +122,89 @@ function batchAvailable(batch, rec) {
 }
 
 function ProcessRecordCard({ rec, batch, canStart, canFinish, onChange }) {
-  const status = rec.status;
+  const status   = rec.status;
+  const shifts   = rec.shift_entries || [];
+  const remaining = rec.qty_remaining ?? Math.max(0, rec.qty_assigned - rec.qty_done);
+
   const cls = status === 'finished'   ? 'border-emerald-200 bg-emerald-50/40'
-            : status === 'in_process' ? 'border-blue-200 bg-blue-50/40'
+            : status === 'in_process' ? 'border-amber-200 bg-amber-50/40'
+            : status === 'paused'     ? 'border-blue-200  bg-blue-50/40'
             : 'border-slate-200 opacity-75';
 
   const seqCls = status === 'finished'   ? 'bg-emerald-500 text-white'
-               : status === 'in_process' ? 'bg-blue-500 text-white'
+               : status === 'in_process' ? 'bg-amber-500 text-white'
+               : status === 'paused'     ? 'bg-blue-500 text-white'
                : 'bg-slate-200 text-slate-600';
 
   return (
-    <div className={`border rounded-xl px-4 py-3 flex items-center gap-3 ${cls}`}>
-      <div className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 ${seqCls}`}>
-        {status === 'finished' ? '✓' : rec.sequence}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold">{rec.process_label}</div>
-        <div className="text-xs text-slate-500 mt-0.5">
-          {status === 'finished' && (
-            <>✅ {rec.qty_done} uds {rec.operator_data && `· ${rec.operator_data.full_name}`} {rec.finished_at && `· ${formatDateTime(rec.finished_at)}`}</>
+    <div className={`border rounded-xl px-4 py-3 ${cls}`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 ${seqCls}`}>
+          {status === 'finished' ? '✓' : rec.sequence}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold">{rec.process_label}</div>
+          <div className="text-xs text-slate-500 mt-0.5">
+            {status === 'pending'    && <>⏳ Pendiente — {rec.qty_assigned} uds</>}
+            {status === 'paused'     && <>⏸ Pausado — <strong>{rec.qty_done}</strong> de {rec.qty_assigned} uds · faltan <strong className="text-blue-700">{remaining}</strong></>}
+            {status === 'in_process' && <>🔄 Turno activo — <strong>{rec.qty_done}</strong> de {rec.qty_assigned} uds · {rec.active_shift_operator?.full_name || rec.operator_data?.full_name}</>}
+            {status === 'finished'   && <>✅ {rec.qty_done} uds {rec.finished_at && `· ${formatDateTime(rec.finished_at)}`}</>}
+            {rec.machine_data && status !== 'pending' && ` · ${rec.machine_data.name}`}
+          </div>
+
+          {/* Barra de progreso si hay avance */}
+          {(status === 'paused' || status === 'in_process' || status === 'finished') && (
+            <div className="mt-1.5 h-1.5 bg-white/70 rounded-full overflow-hidden">
+              <div className={`h-full transition-all ${status === 'finished' ? 'bg-emerald-500' : status === 'in_process' ? 'bg-amber-500' : 'bg-blue-500'}`}
+                   style={{ width: `${rec.progress_pct}%` }}/>
+            </div>
           )}
-          {status === 'in_process' && (
-            <>🔄 En proceso — {rec.qty_assigned} uds {rec.operator_data && `· ${rec.operator_data.full_name}`} {rec.started_at && `· Inició: ${formatDateTime(rec.started_at)}`}</>
-          )}
-          {status === 'pending' && <>⏳ Pendiente — {rec.qty_assigned} uds</>}
-          {rec.machine_data && ` · ${rec.machine_data.name}`}
+        </div>
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <StatusBadge status={status} />
+          <div className="flex gap-1 flex-wrap justify-end">
+            {(status === 'in_process' || status === 'paused' || status === 'finished') && (
+              <Link to={rec.has_quality_check ? `/calidad/ver/${rec.id}` : `/calidad/nuevo/${rec.id}`}
+                className="btn btn-outline btn-sm text-[11px]" style={{ borderColor: rec.has_quality_check ? undefined : '#d97706' }}>
+                {rec.has_quality_check ? '🔍 QC' : '+ QC'}
+              </Link>
+            )}
+            {status === 'in_process' && (
+              <Link to={`/dimensional/${rec.id}/nueva`} className="btn btn-outline btn-sm text-[11px]">📏</Link>
+            )}
+            {(status === 'finished' || status === 'paused') && (
+              <Link to={`/dimensional/${rec.id}`} className="btn btn-outline btn-sm text-[11px]">📏 Dim.</Link>
+            )}
+            {canStart  && <Link to={`/proceso/iniciar/${rec.id}`}  className="btn btn-primary btn-sm">{status === 'paused' ? '↻ Continuar' : 'Iniciar'}</Link>}
+            {canFinish && <Link to={`/proceso/terminar/${rec.id}`} className="btn btn-success btn-sm">Cerrar turno</Link>}
+          </div>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-        <StatusBadge status={status} />
-        <div className="flex gap-1 flex-wrap justify-end">
-          {/* Quality buttons */}
-          {(status === 'in_process' || status === 'finished') && (
-            <Link to={rec.has_quality_check ? `/calidad/ver/${rec.id}` : `/calidad/nuevo/${rec.id}`}
-              className="btn btn-outline btn-sm text-[11px]" style={{ borderColor: rec.has_quality_check ? undefined : '#d97706' }}>
-              {rec.has_quality_check ? '🔍 QC' : '+ QC'}
-            </Link>
-          )}
-          {status === 'in_process' && (
-            <Link to={`/dimensional/${rec.id}/nueva`} className="btn btn-outline btn-sm text-[11px]">📏</Link>
-          )}
-          {status === 'finished' && (
-            <Link to={`/dimensional/${rec.id}`} className="btn btn-outline btn-sm text-[11px]">📏 Dim.</Link>
-          )}
-          {/* Start / Finish */}
-          {canStart && <Link to={`/proceso/iniciar/${rec.id}`} className="btn btn-primary btn-sm">Iniciar</Link>}
-          {canFinish && <Link to={`/proceso/terminar/${rec.id}`} className="btn btn-success btn-sm">Terminar</Link>}
-        </div>
-      </div>
+
+      {/* Historial de turnos */}
+      {shifts.length > 0 && (
+        <details className="mt-2 ml-11">
+          <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700 select-none">
+            Ver turnos ({shifts.length})
+          </summary>
+          <div className="mt-2 space-y-1">
+            {shifts.map(s => (
+              <div key={s.id} className="text-xs bg-white/70 rounded-lg px-2.5 py-1.5 flex items-center justify-between border border-slate-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.finished_at ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}/>
+                  <span className="font-medium text-slate-700">{s.operator_data?.full_name || '—'}</span>
+                  {s.shift && <span className="font-mono text-slate-400">[{s.shift}]</span>}
+                  {s.machine_data && <span className="text-slate-400">· {s.machine_data.name}</span>}
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="font-mono text-slate-700"><strong>{s.qty_done}</strong> uds</span>
+                  <span className="text-slate-400">{formatDateTime(s.finished_at || s.started_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
