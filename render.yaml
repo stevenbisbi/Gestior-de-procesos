@@ -1,0 +1,37 @@
+# Render Blueprint — despliega web service + Postgres
+# Conectar el repo en Render y elegir "Apply blueprint"
+# Docs: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: tuberia-db
+    plan: free
+    databaseName: tuberia
+    user: tuberia
+
+services:
+  - type: web
+    name: tuberia-app
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: "./build.sh"
+    startCommand: "cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
+    autoDeploy: true
+    healthCheckPath: /api/auth/me/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tuberia-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        value: ""    # Vacío en producción (el frontend se sirve del mismo origen)
+      - key: WEB_CONCURRENCY
+        value: "2"
