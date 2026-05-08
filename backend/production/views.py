@@ -17,6 +17,15 @@ from .serializers import (TubeSpecSerializer, ProductTypeSerializer, MachineSeri
                           CuttingProgramLineSerializer)
 
 
+# ─── Health check (público — usado por Render) ──────────
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def health_check(request):
+    return Response({'status': 'ok'})
+
+
 # ─── Auth ────────────────────────────────────────────────
 
 @api_view(['POST'])

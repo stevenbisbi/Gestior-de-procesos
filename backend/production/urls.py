@@ -12,6 +12,7 @@ router.register(r'cutting-programs',  views.CuttingProgramViewSet)
 router.register(r'cutting-lines',     views.CuttingProgramLineViewSet)
 
 urlpatterns = [
+    path('health/',      views.health_check),  # público, para healthchecks
     path('auth/login/',  views.login_view),
     path('auth/logout/', views.logout_view),
     path('auth/me/',     views.me_view),
