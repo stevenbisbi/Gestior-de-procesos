@@ -1,14 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+// En producción Django sirve el build vía WhiteNoise bajo /static/
+// (collectstatic copia frontend_build/* → staticfiles/*)
+export default defineConfig(({ command }) => ({
   plugins: [react()],
+  base: command === 'build' ? '/static/' : '/',
   server: {
     port: 5173,
     proxy: {
-      // En dev, proxy de API → Django backend
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/admin': { target: 'http://localhost:8000', changeOrigin: true },
+      '/api':    { target: 'http://localhost:8000', changeOrigin: true },
+      '/admin':  { target: 'http://localhost:8000', changeOrigin: true },
       '/static': { target: 'http://localhost:8000', changeOrigin: true },
     },
   },
@@ -16,4 +18,4 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
-})
+}))

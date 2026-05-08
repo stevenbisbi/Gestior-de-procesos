@@ -10,6 +10,11 @@ python = ">=3.11"
 django = ">=4.2,<5.0"
 djangorestframework = ">=3.14"
 django-cors-headers = ">=4.3"
+# Producción (Render)
+gunicorn = ">=21.2"
+whitenoise = ">=6.6"
+psycopg2-binary = ">=2.9"
+dj-database-url = ">=2.1"
 
 [build-system]
 requires = ["poetry-core"]
