@@ -176,7 +176,7 @@ function ProcessRecordCard({ rec, batch, canStart, canFinish, onChange }) {
               <Link to={`/dimensional/${rec.id}`} className="btn btn-outline btn-sm text-[11px]">📏 Dim.</Link>
             )}
             {canStart  && <Link to={`/proceso/iniciar/${rec.id}`}  className="btn btn-primary btn-sm">{status === 'paused' ? '↻ Continuar' : 'Iniciar'}</Link>}
-            {canFinish && <Link to={`/proceso/terminar/${rec.id}`} className="btn btn-success btn-sm">Cerrar turno</Link>}
+            {canFinish && <Link to={`/proceso/terminar/${rec.id}`} className="btn btn-success btn-sm">Finalizar</Link>}
           </div>
         </div>
       </div>

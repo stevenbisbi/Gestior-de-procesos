@@ -66,7 +66,7 @@ class ProcessShiftEntryAdmin(admin.ModelAdmin):
 class CuttingProgramLineInline(admin.TabularInline):
     model  = CuttingProgramLine
     extra  = 0
-    fields = ['product_type','pedido_quantity','total_quantity','start_day','end_day',
+    fields = ['product_type','pedido_quantity','total_quantity','start_date','end_date',
               'saw_type','rpm','client','batch']
     readonly_fields = ['batch']
 

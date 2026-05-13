@@ -78,12 +78,12 @@ for uname, fn, ln, grp in users_data:
 
 # ── Especificaciones de tubo ─────────────────────────────────────────────────
 tubes_data = [
-    ('round',  22.2, 1.6, 'hr',  6000),
-    ('round',  19.1, 1.2, 'hr',  6000),
-    ('round',  25.4, 1.6, 'hr',  6000),
-    ('round',  31.8, 1.6, 'hr',  6000),
-    ('square', 25.4, 1.6, 'hr',  6000),
-    ('round',  28.6, 1.6, 'cr',  6000),
+    ('round',  '22.2', 1.6, 'hr',  6000),
+    ('round',  '19.1', 1.2, 'hr',  6000),
+    ('round',  '25.4', 1.6, 'hr',  6000),
+    ('round',  '31.8', 1.6, 'hr',  6000),
+    ('square', '25.4', 1.6, 'hr',  6000),
+    ('round',  '28.6', 1.6, 'cr',  6000),
 ]
 T = {}
 for sh, od, th, mat, lg in tubes_data:

@@ -108,10 +108,10 @@ export default function ProcessFinish() {
       </div>
 
       <form onSubmit={submit} className="space-y-3">
-        {/* Cantidad de ESTE turno */}
+        {/* Cantidad realizada */}
         <div className="card">
           <div className="card-header">
-            <span className="card-title">¿Cuánto hiciste en este turno?</span>
+            <span className="card-title">¿Cuántas piezas realizaste?</span>
             <span className="text-xs text-slate-400">Máx: {remaining} uds</span>
           </div>
           <div className="card-body">
@@ -133,7 +133,7 @@ export default function ProcessFinish() {
               </div>
             ) : (
               <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
-                ⏸ Quedarán <strong>{(remaining - numericQty).toLocaleString()} uds</strong> pendientes para que otro operario las termine.
+                ⏸ Quedarán <strong>{(remaining - numericQty).toLocaleString()} uds</strong> pendientes. Otro operario (o vos en otro momento) podrá continuarlas.
               </div>
             )}
           </div>
@@ -146,9 +146,9 @@ export default function ProcessFinish() {
               <tbody>
                 <tr><td className="py-1 text-slate-600">Proceso</td>
                   <td className="py-1 font-semibold text-right">{record.process_label}</td></tr>
-                <tr><td className="py-1 text-slate-600">Operario (este turno)</td>
+                <tr><td className="py-1 text-slate-600">Operario</td>
                   <td className="py-1 font-semibold text-right">{user.full_name}</td></tr>
-                <tr><td className="py-1 text-slate-600">Tiempo del turno</td>
+                <tr><td className="py-1 text-slate-600">Tiempo trabajado</td>
                   <td className="py-1 text-right">{elapsed}</td></tr>
                 {record.machine_data && (
                   <tr><td className="py-1 text-slate-600">Máquina</td>
@@ -191,7 +191,7 @@ export default function ProcessFinish() {
         </div>
 
         <button type="submit" disabled={saving} className="btn btn-success btn-full py-4 text-base">
-          {saving ? 'Guardando...' : willFinish ? '✔ TERMINAR PROCESO' : '⏸ CERRAR TURNO'}
+          {saving ? 'Guardando...' : willFinish ? '✔ FINALIZAR PROCESO' : '✔ FINALIZAR'}
         </button>
       </form>
     </div>

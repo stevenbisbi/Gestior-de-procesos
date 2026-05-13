@@ -41,7 +41,7 @@ export default function ProductPicker({ value, onChange }) {
   const filtered = products.filter(p => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    const hay = `${p.name} ${p.client || ''} ${p.tube_spec_data?.label || ''} ${p.cut_length}`.toLowerCase();
+    const hay = `${p.name} ${p.item_code || ''} ${p.client || ''} ${p.tube_spec_data?.label || ''} ${p.cut_length}`.toLowerCase();
     return hay.includes(q);
   });
 
@@ -64,7 +64,14 @@ export default function ProductPicker({ value, onChange }) {
       {selected ? (
         <div className="border border-slate-300 rounded-lg px-3 py-2 bg-white flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm text-slate-800 truncate">{selected.name}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm text-slate-800 truncate">{selected.name}</span>
+              {selected.item_code && (
+                <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                  {selected.item_code}
+                </span>
+              )}
+            </div>
             <div className="text-xs text-slate-500 truncate">
               {selected.tube_spec_data?.label} · corte {selected.cut_length} mm
               {selected.client && ` · ${selected.client}`}
@@ -85,7 +92,7 @@ export default function ProductPicker({ value, onChange }) {
             value={query}
             onChange={e => { setQuery(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            placeholder={loading ? 'Cargando productos…' : 'Buscar por nombre, tubo, cliente…'}
+            placeholder={loading ? 'Cargando productos…' : 'Buscar por nombre, item, tubo, cliente…'}
             disabled={loading}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
           />
@@ -101,7 +108,14 @@ export default function ProductPicker({ value, onChange }) {
                     onClick={() => onPick(p)}
                     className="w-full text-left px-3 py-2 hover:bg-blue-50 transition border-b border-slate-50 last:border-b-0"
                   >
-                    <div className="font-medium text-sm text-slate-800">{p.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-slate-800">{p.name}</span>
+                      {p.item_code && (
+                        <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          {p.item_code}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-500">
                       {p.tube_spec_data?.label} · corte {p.cut_length} mm
                       {p.client && <span className="text-blue-500"> · {p.client}</span>}
@@ -170,7 +184,7 @@ function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, 
 
   // — ProductType —
   const [prod, setProd] = useState({
-    name: initialName, cut_length: '', client: '',
+    name: initialName, item_code: '', cut_length: '', client: '',
     default_priority: 'media',
     requires_chaflan: false, requires_moleteo: false, requires_curvado: false,
     saw_type: 'none', rpm: '',
@@ -186,15 +200,31 @@ function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, 
       // 1) Resolver TubeSpec
       let tubeSpecId = tubeId;
       if (tubeMode === 'new') {
-        const newTube = await Catalog.createTube({
-          shape:           tube.shape,
-          outer_diameter:  Number(tube.outer_diameter),
-          thickness:       Number(tube.thickness),
-          material:        tube.material,
-          original_length: Number(tube.original_length) || 6000,
-        });
-        onTubeCreated(newTube);
-        tubeSpecId = newTube.id;
+        // outer_diameter es CharField — se envía como string ('22.2', '1/2', etc.)
+        const od = String(tube.outer_diameter).trim();
+        const th = Number(tube.thickness);
+        const ol = Number(tube.original_length) || 6000;
+
+        // Buscar primero un TubeSpec idéntico para evitar choque con unique_together
+        const existing = tubes.find(t =>
+          String(t.outer_diameter).trim() === od &&
+          Number(t.thickness) === th &&
+          t.material === tube.material &&
+          Number(t.original_length) === ol
+        );
+        if (existing) {
+          tubeSpecId = existing.id;
+        } else {
+          const newTube = await Catalog.createTube({
+            shape:           tube.shape,
+            outer_diameter:  od,
+            thickness:       th,
+            material:        tube.material,
+            original_length: ol,
+          });
+          onTubeCreated(newTube);
+          tubeSpecId = newTube.id;
+        }
       }
       if (!tubeSpecId) {
         setErr('Selecciona o crea un tubo.');
@@ -263,10 +293,11 @@ function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, 
                       <option value="square">Cuadrado</option>
                     </select>
                   </Field>
-                  <Field label="Diámetro / lado (mm)">
-                    <input type="number" step="0.01" required className={inpCls}
+                  <Field label="Diámetro / lado" hint="Admite '1/2', '5/8', '22.2', etc.">
+                    <input type="text" required className={inpCls}
                       value={tube.outer_diameter}
-                      onChange={e => setTube(s => ({...s, outer_diameter: e.target.value}))}/>
+                      onChange={e => setTube(s => ({...s, outer_diameter: e.target.value}))}
+                      placeholder="22.2 ó 1/2"/>
                   </Field>
                   <Field label="Espesor (mm)">
                     <input type="number" step="0.01" required className={inpCls}
@@ -299,6 +330,11 @@ function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, 
                     value={prod.name}
                     onChange={e => setProd(s => ({...s, name: e.target.value}))}
                     placeholder="Manubrio 838"/>
+                </Field>
+                <Field label="Item / SKU" hint="Código interno (ej. 877135)">
+                  <input className={inpCls}
+                    value={prod.item_code}
+                    onChange={e => setProd(s => ({...s, item_code: e.target.value}))}/>
                 </Field>
                 <Field label="Longitud de corte (mm)">
                   <input type="number" step="0.1" required className={inpCls}
