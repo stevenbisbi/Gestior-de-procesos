@@ -12,7 +12,8 @@ class TubeSpec(models.Model):
     MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST')]
 
     shape           = models.CharField(max_length=10, choices=SHAPE_CHOICES)
-    outer_diameter  = models.FloatField(verbose_name='Diámetro/lado (mm)')
+    # CharField — admite valores fraccionados como "1/2", "5/8" o decimales "22.2"
+    outer_diameter  = models.CharField(max_length=20, verbose_name='Diámetro/lado (mm)')
     thickness       = models.FloatField(verbose_name='Espesor (mm)')
     material        = models.CharField(max_length=10, choices=MATERIAL_CHOICES)
     original_length = models.FloatField(default=6000, verbose_name='Longitud original (mm)')
@@ -30,6 +31,7 @@ class ProductType(models.Model):
     PRIORITY_CHOICES = [('alta','Alta'),('media','Media'),('baja','Baja')]
 
     name              = models.CharField(max_length=100)
+    item_code         = models.CharField(max_length=50, blank=True, verbose_name='Item / SKU')
     tube_spec         = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='product_types')
     cut_length        = models.FloatField(verbose_name='Longitud de corte (mm)')
     client            = models.CharField(max_length=200, blank=True)
@@ -177,9 +179,9 @@ class CuttingProgramLine(models.Model):
         ProductType, on_delete=models.PROTECT, related_name='program_lines',
     )
 
-    # Programación
-    start_day       = models.IntegerField(verbose_name='Día inicio')
-    end_day         = models.IntegerField(verbose_name='Día final')
+    # Programación (fechas reales). Nullable a nivel DB; el form las exige.
+    start_date      = models.DateField(null=True, blank=True, verbose_name='Fecha inicio')
+    end_date        = models.DateField(null=True, blank=True, verbose_name='Fecha final')
     pieces_per_hour = models.FloatField(null=True, blank=True, verbose_name='Piezas/hora')
 
     # Identificación (tal como aparece en el documento físico)
@@ -187,13 +189,13 @@ class CuttingProgramLine(models.Model):
     tube_description = models.CharField(max_length=300, verbose_name='Descripción tramo cortado')
 
     # Cantidades
-    pedido_quantity = models.IntegerField(verbose_name='Cantidad pedida (cliente)')
-    total_quantity  = models.IntegerField(verbose_name='Total a cortar')
-    demo_pieces     = models.IntegerField(default=0, verbose_name='Piezas demo')
-
-    # Tubo largo (materia prima)
-    tube_count     = models.IntegerField(null=True, blank=True, verbose_name='Tramos tubo (cantidad)')
-    tube_length_mm = models.FloatField(null=True, blank=True, verbose_name='Tubo largo (mm)')
+    # pedido_quantity = piezas pequeñas pedidas por el cliente (= total a cortar normalmente)
+    pedido_quantity   = models.IntegerField(verbose_name='Cantidad pedida (piezas)')
+    total_quantity    = models.IntegerField(verbose_name='Total a cortar (piezas)')
+    # tubos largos disponibles y cuántos cortes salen de cada uno
+    tube_count        = models.IntegerField(null=True, blank=True, verbose_name='Tubos largos (cantidad)')
+    sections_per_tube = models.IntegerField(null=True, blank=True, verbose_name='Tramos por tubo')
+    tube_length_mm    = models.FloatField(null=True, blank=True, verbose_name='Tubo largo (mm)')
 
     # Sierra
     saw_type   = models.CharField(max_length=5, choices=SAW_CHOICES, verbose_name='Tipo sierra')
@@ -219,14 +221,11 @@ class CuttingProgramLine(models.Model):
         """Crea y asocia el ProductionBatch de este renglón si todavía no existe."""
         if self.batch:
             return self.batch
-        from datetime import date
-        day = min(self.start_day, 28)  # evita días inválidos en meses cortos
-        sched = date(self.program.month.year, self.program.month.month, day)
         batch = ProductionBatch.objects.create(
             product_type=self.product_type,
             total_quantity=self.total_quantity,
             priority=self.product_type.default_priority,
-            scheduled_date=sched,
+            scheduled_date=self.start_date,
             notes=f'Generado desde {self.program}',
             created_by=user,
         )

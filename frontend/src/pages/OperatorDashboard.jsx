@@ -83,7 +83,7 @@ export default function OperatorDashboard() {
                   </Link>
                   <Link to={`/proceso/terminar/${rec.id}`}
                     className="btn btn-success btn-sm flex-1 min-w-[100px]">
-                    ✔ Terminar turno
+                    ✔ Finalizar
                   </Link>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { CuttingPrograms, CuttingLines } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { BackLink, Alert, Loading } from '../components/Common';
+import { formatDate } from '../lib/utils';
 import ProductPicker from '../components/ProductPicker';
 
 const STATUS_PROGRAM = {
@@ -41,10 +42,10 @@ const Section = ({ title, children }) => (
 function LineForm({ program, onSave, onCancel, initial }) {
   const empty = {
     program: program.id,
-    product_type: '', start_day: '', end_day: '',
+    product_type: '', start_date: '', end_date: '',
     pieces_per_hour: '', item_code: '', tube_description: '',
-    pedido_quantity: '', total_quantity: '', demo_pieces: '0',
-    tube_count: '', tube_length_mm: '',
+    pedido_quantity: '', total_quantity: '',
+    tube_count: '', sections_per_tube: '', tube_length_mm: '',
     saw_type: 'hss', saw_teeth: '', rpm: '',
     advance_high: '', advance_low: '',
     client: '', packaging: '', notes: '',
@@ -61,6 +62,7 @@ function LineForm({ program, onSave, onCancel, initial }) {
     setForm(f => ({
       ...f,
       product_type: pid,
+      item_code:        f.item_code         || p.item_code || '',
       client:           f.client            || p.client,
       rpm:              f.rpm               || p.rpm,
       saw_type:         f.saw_type !== 'hss' ? f.saw_type : (p.saw_type !== 'none' ? p.saw_type : f.saw_type),
@@ -75,18 +77,18 @@ function LineForm({ program, onSave, onCancel, initial }) {
     try {
       const payload = {
         ...form,
-        start_day:       Number(form.start_day),
-        end_day:         Number(form.end_day),
-        pedido_quantity: Number(form.pedido_quantity),
-        total_quantity:  Number(form.total_quantity),
-        demo_pieces:     Number(form.demo_pieces) || 0,
-        tube_count:      num(form.tube_count),
-        tube_length_mm:  num(form.tube_length_mm),
-        pieces_per_hour: num(form.pieces_per_hour),
-        saw_teeth:       num(form.saw_teeth),
-        rpm:             num(form.rpm),
-        advance_high:    num(form.advance_high),
-        advance_low:     num(form.advance_low),
+        start_date:        form.start_date || null,
+        end_date:          form.end_date   || null,
+        pedido_quantity:   Number(form.pedido_quantity),
+        total_quantity:    Number(form.total_quantity),
+        tube_count:        num(form.tube_count),
+        sections_per_tube: num(form.sections_per_tube),
+        tube_length_mm:    num(form.tube_length_mm),
+        pieces_per_hour:   num(form.pieces_per_hour),
+        saw_teeth:         num(form.saw_teeth),
+        rpm:               num(form.rpm),
+        advance_high:      num(form.advance_high),
+        advance_low:       num(form.advance_low),
       };
       if (initial?.id) await CuttingLines.update(initial.id, payload);
       else             await CuttingLines.create(payload);
@@ -121,23 +123,29 @@ function LineForm({ program, onSave, onCancel, initial }) {
       </Section>
 
       <Section title="Programación y cantidades">
-        <Field label="Día inicio"><input className={inpCls} type="number" min="1" max="31" required value={form.start_day} onChange={e=>set('start_day',e.target.value)}/></Field>
-        <Field label="Día final"><input className={inpCls} type="number" min="1" max="31" required value={form.end_day}   onChange={e=>set('end_day',  e.target.value)}/></Field>
-        <Field label="Cant. pedida" hint="Lo que pide el cliente">
+        <Field label="Fecha inicio">
+          <input className={inpCls} type="date" required value={form.start_date} onChange={e=>set('start_date',e.target.value)}/>
+        </Field>
+        <Field label="Fecha final">
+          <input className={inpCls} type="date" required value={form.end_date}   onChange={e=>set('end_date',  e.target.value)}/>
+        </Field>
+        <Field label="Cant. pedida" hint="Total piezas pequeñas que necesita el cliente">
           <input className={inpCls} type="number" min="1" required value={form.pedido_quantity} onChange={e=>set('pedido_quantity',e.target.value)}/>
         </Field>
-        <Field label="Total a cortar" hint="Incluyendo demos / sobrantes">
+        <Field label="Total a cortar" hint="Piezas que se van a cortar realmente">
           <input className={inpCls} type="number" min="1" required value={form.total_quantity} onChange={e=>set('total_quantity',e.target.value)}/>
         </Field>
-        <Field label="Piezas demo"><input className={inpCls} type="number" min="0" value={form.demo_pieces} onChange={e=>set('demo_pieces',e.target.value)}/></Field>
         <Field label="Piezas/hora"><input className={inpCls} type="number" value={form.pieces_per_hour} onChange={e=>set('pieces_per_hour',e.target.value)}/></Field>
       </Section>
 
       <Section title="Tubo largo (materia prima)">
-        <Field label="Tramos tubo" hint="Cantidad de tubos largos">
+        <Field label="Tubos largos" hint="Cantidad de tubos grandes a usar">
           <input className={inpCls} type="number" min="0" value={form.tube_count} onChange={e=>set('tube_count',e.target.value)}/>
         </Field>
-        <Field label="Tubo largo (mm)" hint="Longitud de cada tubo">
+        <Field label="Tramos por tubo" hint="Cortes pequeños que salen de cada tubo grande">
+          <input className={inpCls} type="number" min="0" value={form.sections_per_tube} onChange={e=>set('sections_per_tube',e.target.value)}/>
+        </Field>
+        <Field label="Tubo largo (mm)" hint="Longitud de cada tubo grande">
           <input className={inpCls} type="number" step="0.1" value={form.tube_length_mm} onChange={e=>set('tube_length_mm',e.target.value)}/>
         </Field>
       </Section>
@@ -175,9 +183,10 @@ function ProgramLineRow({ line, isSupervisor, onEdit, onDelete }) {
   const bs = BATCH_STATUS[line.batch_status] || {};
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
-      {/* Días */}
-      <td className="py-3 px-3 text-sm text-slate-600 whitespace-nowrap">
-        {line.start_day} – {line.end_day}
+      {/* Fechas */}
+      <td className="py-3 px-3 text-xs text-slate-600 whitespace-nowrap">
+        <div>{line.start_date ? formatDate(line.start_date) : '—'}</div>
+        <div className="text-slate-400">→ {line.end_date ? formatDate(line.end_date) : '—'}</div>
       </td>
       {/* Producto / tubo */}
       <td className="py-3 px-3">
@@ -195,7 +204,8 @@ function ProgramLineRow({ line, isSupervisor, onEdit, onDelete }) {
       </td>
       {/* Tubo largo */}
       <td className="py-3 px-3 text-center text-xs text-slate-600">
-        {line.tube_count ? <div><strong>{line.tube_count}</strong> ud</div> : <span className="text-slate-300">—</span>}
+        {line.tube_count ? <div><strong>{line.tube_count}</strong> tubos</div> : <span className="text-slate-300">—</span>}
+        {line.sections_per_tube && <div className="text-slate-400">{line.sections_per_tube} tramos c/u</div>}
         {line.tube_length_mm && <div className="text-slate-400">{line.tube_length_mm} mm</div>}
       </td>
       {/* Sierra */}
@@ -391,7 +401,7 @@ export default function CuttingProgramDetail() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
-                  <th className="py-3 px-3 text-left whitespace-nowrap">Días</th>
+                  <th className="py-3 px-3 text-left whitespace-nowrap">Fechas</th>
                   <th className="py-3 px-3 text-left">Producto / Tubo</th>
                   <th className="py-3 px-3 text-center whitespace-nowrap">Cantidades</th>
                   <th className="py-3 px-3 text-center whitespace-nowrap">Tubo largo</th>
