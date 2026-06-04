@@ -122,6 +122,40 @@ class ProductionBatch(models.Model):
         prev = self.records.filter(process_type=route[idx-1]).first()
         return prev and prev.status == 'finished'
 
+    def sync_records_qty(self):
+        """
+        Reaplica total_quantity como qty_assigned a todos los procesos y recalcula
+        sus estados según lo ya producido. Se llama cuando el supervisor corrige el conteo.
+        """
+        for rec in self.records.all():
+            rec.qty_assigned = self.total_quantity
+            if rec.active_shift:
+                rec.status = 'in_process'
+            elif rec.qty_done >= self.total_quantity and rec.qty_done > 0:
+                rec.status = 'finished'
+                if not rec.finished_at:
+                    rec.finished_at = timezone.now()
+            elif rec.qty_done > 0:
+                rec.status = 'paused'
+            else:
+                rec.status = 'pending'
+            rec.save(update_fields=['qty_assigned', 'status', 'finished_at'])
+        self._recalc_status()
+
+    def _recalc_status(self):
+        """Recalcula el estado del lote a partir de sus procesos (no toca dispatched)."""
+        if self.status == 'dispatched':
+            return
+        if not self.records.exists():
+            return
+        if not self.records.exclude(status='finished').exists():
+            self.status = 'finished'
+        elif self.records.exclude(status='pending').exists():
+            self.status = 'in_process'
+        else:
+            self.status = 'in_basket'
+        self.save(update_fields=['status', 'updated_at'])
+
     @property
     def progress_pct(self):
         """Avance ponderado real: suma de uds hechas en TODOS los procesos / total esperado."""
@@ -315,8 +349,13 @@ class ProcessRecord(models.Model):
             self.batch.save(update_fields=['status', 'updated_at'])
         return entry
 
-    def end_shift(self, qty_done_this_shift, user, signature='', notes=''):
-        """Cierra el turno activo. Si se completó qty_assigned → finished, sino → paused."""
+    def end_shift(self, qty_done_this_shift, user, signature='', notes='', finalize=False):
+        """
+        Cierra el turno activo.
+        - Si total >= qty_assigned → finished
+        - Si finalize=True → finished aunque falten unidades (merma/material perdido)
+        - Sino → paused (queda disponible para otro operario)
+        """
         from django.core.exceptions import ValidationError
         from django.db.models import Sum
         active = self.active_shift
@@ -334,7 +373,7 @@ class ProcessRecord(models.Model):
         self.qty_done   = total
         self.signature  = signature  # firma del último turno (legacy)
 
-        if total >= self.qty_assigned:
+        if total >= self.qty_assigned or finalize:
             self.status      = 'finished'
             self.finished_at = active.finished_at
         else:

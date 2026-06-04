@@ -49,6 +49,7 @@ export const Batches = {
   list:    (params = {}) => api.get('/batches/?' + new URLSearchParams(params)),
   get:     (id)          => api.get(`/batches/${id}/`),
   create:  (data)        => api.post('/batches/', data),
+  update:  (id, data)    => api.patch(`/batches/${id}/`, data),
   dispatch:(id)          => api.post(`/batches/${id}/dispatch/`),  // url_path='dispatch' on backend
 };
 

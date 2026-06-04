@@ -113,6 +113,13 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
         batch = serializer.save(created_by=self.request.user)
         batch.create_process_records()
 
+    def perform_update(self, serializer):
+        old_qty = serializer.instance.total_quantity
+        batch = serializer.save()
+        # Si el supervisor corrigió la cantidad, propagar a los procesos
+        if batch.total_quantity != old_qty:
+            batch.sync_records_qty()
+
     @action(detail=True, methods=['post'], url_path='dispatch')
     def dispatch_batch(self, request, pk=None):
         batch = self.get_object()
@@ -163,6 +170,7 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'No hay turno activo en este proceso.'}, status=400)
 
         qty = int(request.data.get('qty_done', 0))
+        finalize = request.data.get('finalize') in (True, 'true', '1', 1)
         remaining = record.qty_remaining
         if qty < 1 or qty > remaining:
             return Response(
@@ -175,6 +183,7 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 user=request.user,
                 signature=request.data.get('signature', ''),
                 notes=request.data.get('notes', ''),
+                finalize=finalize,
             )
         except Exception as e:
             return Response({'detail': str(e)}, status=400)

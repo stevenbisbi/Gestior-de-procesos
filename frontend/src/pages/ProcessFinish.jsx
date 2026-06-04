@@ -19,6 +19,7 @@ export default function ProcessFinish() {
   const [elapsed, setElapsed]     = useState('—');
   const [error, setError]         = useState(null);
   const [saving, setSaving]       = useState(false);
+  const [finalize, setFinalize]   = useState(false); // finalizar referencia aunque falten uds
 
   useEffect(() => {
     Records.get(id).then(r => {
@@ -50,8 +51,11 @@ export default function ProcessFinish() {
   if (!record) return <Loading />;
 
   const remaining   = record.qty_remaining ?? (record.qty_assigned - record.qty_done);
-  const willFinish  = Number(qtyDone) >= remaining;
   const numericQty  = Math.max(1, Math.min(remaining, parseInt(qtyDone) || 1));
+  // El proceso se completa si se alcanza el total O si el operario marca "finalizar"
+  const reachesTotal = numericQty >= remaining;
+  const willFinish   = reachesTotal || finalize;
+  const shortage     = remaining - numericQty;  // unidades que faltarían si finaliza
 
   const submit = async (e) => {
     e.preventDefault();
@@ -60,6 +64,7 @@ export default function ProcessFinish() {
       await Records.finish(id, {
         qty_done:  numericQty,
         signature, notes,
+        finalize:  finalize || reachesTotal,
       });
       nav(`/lote/${record.batch}`);
     } catch (err) {
@@ -127,14 +132,34 @@ export default function ProcessFinish() {
             </div>
 
             {/* Indicador del resultado */}
-            {willFinish ? (
+            {reachesTotal ? (
               <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
                 ✅ Con esta cantidad <strong>se completa</strong> el proceso. Quedará marcado como Terminado.
               </div>
+            ) : finalize ? (
+              <div className="mt-3 bg-orange-50 border border-orange-300 rounded-lg px-3 py-2 text-sm text-orange-800">
+                ⚠️ Vas a <strong>finalizar la referencia</strong> con {shortage.toLocaleString()} uds menos
+                (pérdida de material). El proceso quedará Terminado y nadie continuará el saldo.
+              </div>
             ) : (
               <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
-                ⏸ Quedarán <strong>{(remaining - numericQty).toLocaleString()} uds</strong> pendientes. Otro operario (o vos en otro momento) podrá continuarlas.
+                ⏸ Quedarán <strong>{shortage.toLocaleString()} uds</strong> pendientes. Otro operario (o vos en otro momento) podrá continuarlas.
               </div>
+            )}
+
+            {/* Finalizar aunque falten unidades (merma) */}
+            {!reachesTotal && (
+              <label className="mt-3 flex items-start gap-2 cursor-pointer select-none bg-white border border-slate-200 rounded-lg px-3 py-2">
+                <input type="checkbox" checked={finalize}
+                  onChange={e => setFinalize(e.target.checked)}
+                  className="mt-0.5" />
+                <span className="text-sm text-slate-700">
+                  <strong>Finalizar la referencia completa</strong> aunque falten {shortage.toLocaleString()} uds
+                  <span className="block text-xs text-slate-400">
+                    Úsalo cuando se perdió material y no se van a producir las piezas faltantes.
+                  </span>
+                </span>
+              </label>
             )}
           </div>
         </div>
@@ -191,7 +216,10 @@ export default function ProcessFinish() {
         </div>
 
         <button type="submit" disabled={saving} className="btn btn-success btn-full py-4 text-base">
-          {saving ? 'Guardando...' : willFinish ? '✔ FINALIZAR PROCESO' : '✔ FINALIZAR'}
+          {saving ? 'Guardando...'
+            : reachesTotal ? '✔ FINALIZAR PROCESO'
+            : finalize     ? '⚠️ FINALIZAR CON MERMA'
+            : '✔ FINALIZAR'}
         </button>
       </form>
     </div>

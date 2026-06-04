@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Batches } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -12,6 +13,7 @@ export default function BatchDetail() {
   const [batch, setBatch] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
 
   const refresh = () => {
     setLoading(true);
@@ -21,6 +23,7 @@ export default function BatchDetail() {
   useEffect(refresh, [id]);
 
   const canDispatch = batch?.status === 'finished' && user.is_supervisor;
+  const canEdit     = user.is_supervisor && batch?.status !== 'dispatched';
 
   const handleDispatch = async () => {
     if (!confirm('¿Confirmar despacho a almacén? El lote saldrá del seguimiento activo.')) return;
@@ -58,9 +61,15 @@ export default function BatchDetail() {
               <h2 className="text-lg font-bold">{batch.product_type_data?.name}</h2>
               <div className="text-sm text-slate-600 mt-0.5">{tube?.label}</div>
             </div>
-            <div className="text-right">
-              <div className="font-mono text-2xl font-semibold">{batch.total_quantity}</div>
-              <div className="text-xs text-slate-400">uds totales</div>
+            <div className="text-right flex flex-col items-end gap-1">
+              <div>
+                <div className="font-mono text-2xl font-semibold">{batch.total_quantity}</div>
+                <div className="text-xs text-slate-400">uds totales</div>
+              </div>
+              {canEdit && (
+                <button onClick={() => setEditing(true)}
+                  className="btn btn-outline btn-sm text-xs mt-1">✏️ Editar lote</button>
+              )}
             </div>
           </div>
 
@@ -108,7 +117,115 @@ export default function BatchDetail() {
           <button onClick={handleDispatch} className="btn btn-success btn-full">📦 Despachar a almacén</button>
         </div>
       )}
+
+      {editing && (
+        <EditBatchModal
+          batch={batch}
+          onClose={() => setEditing(false)}
+          onSaved={() => { setEditing(false); refresh(); }}
+          onError={setError}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Modal de edición de lote (supervisor) ───────────────────────────────────
+function EditBatchModal({ batch, onClose, onSaved, onError }) {
+  const [form, setForm] = useState({
+    total_quantity: batch.total_quantity,
+    priority:       batch.priority,
+    scheduled_date: batch.scheduled_date || '',
+    notes:          batch.notes || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const maxDone = Math.max(0, ...(batch.records || []).map(r => r.qty_done || 0));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const qty = Number(form.total_quantity);
+    if (qty < 1) { setErr('La cantidad debe ser al menos 1.'); return; }
+    setSaving(true); setErr('');
+    try {
+      await Batches.update(batch.id, {
+        total_quantity: qty,
+        priority:       form.priority,
+        scheduled_date: form.scheduled_date || null,
+        notes:          form.notes,
+      });
+      onSaved();
+    } catch (ex) {
+      setErr(ex.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400';
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-8">
+        <form onSubmit={submit}>
+          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800">✏️ Editar lote {batch.batch_code}</h2>
+            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+          </div>
+
+          <div className="px-5 py-4 space-y-4">
+            {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Cantidad total (uds)</span>
+              <input type="number" min="1" required className={`${inp} mt-1`}
+                value={form.total_quantity}
+                onChange={e => set('total_quantity', e.target.value)} />
+              <span className="text-[10px] text-slate-400">
+                Al cambiarla se recalculan los procesos. Lo ya producido se conserva.
+                {maxDone > 0 && ` Máximo ya hecho en un proceso: ${maxDone} uds.`}
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Prioridad</span>
+              <select className={`${inp} mt-1 bg-white`}
+                value={form.priority}
+                onChange={e => set('priority', e.target.value)}>
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Fecha programada</span>
+              <input type="date" className={`${inp} mt-1`}
+                value={form.scheduled_date}
+                onChange={e => set('scheduled_date', e.target.value)} />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notas</span>
+              <textarea rows={2} className={`${inp} mt-1 resize-none`}
+                value={form.notes}
+                onChange={e => set('notes', e.target.value)} />
+            </label>
+          </div>
+
+          <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-2xl">
+            <button type="button" onClick={onClose} className="btn btn-outline px-4">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn btn-primary px-5">
+              {saving ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
   );
 }
 
