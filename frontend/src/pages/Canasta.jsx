@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Batches, TubeReceptions } from '../lib/api';
+import { Batches, TubeReceptions, Catalog } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Loading, Alert, PriorityTag } from '../components/Common';
 import { formatDateTime, formatDate } from '../lib/utils';
@@ -14,6 +14,7 @@ export default function Canasta() {
   const [loading, setLoading]     = useState(true);
   const [err, setErr]             = useState('');
   const [receivingBatch, setReceivingBatch] = useState(null);
+  const [showStandalone, setShowStandalone] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
@@ -47,6 +48,19 @@ export default function Canasta() {
             <strong className="text-green-300">{inBasket.length}</strong> listos para cortar
           </p>
         </div>
+        <button onClick={() => setShowStandalone(true)}
+          className="btn btn-outline border-white/30 text-white hover:bg-white/10 px-4 py-2 whitespace-nowrap">
+          📥 Recibir tubería suelta
+        </button>
+      </div>
+
+      {/* Hint sobre los dos tipos de recepción */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-xs text-blue-900 flex items-start gap-2">
+        <span className="text-base">💡</span>
+        <span>
+          Si la tubería llega para un <strong>lote específico</strong>, recíbela desde su tarjeta abajo.
+          Si es material que llegó <strong>sin orden previa</strong>, usá <em>"Recibir tubería suelta"</em> arriba.
+        </span>
       </div>
 
       {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
@@ -142,7 +156,147 @@ export default function Canasta() {
           onReceived={() => { setReceivingBatch(null); refresh(); }}
         />
       )}
+
+      {showStandalone && (
+        <StandaloneReceiveModal
+          user={user}
+          onClose={() => setShowStandalone(false)}
+          onReceived={() => { setShowStandalone(false); refresh(); }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Modal de recepción SIN lote (tubería suelta) ────────────────────────────
+function StandaloneReceiveModal({ user, onClose, onReceived }) {
+  const [tubes, setTubes] = useState([]);
+  const [loadingTubes, setLoadingTubes] = useState(true);
+  const [form, setForm] = useState({
+    tube_spec: '', quantity: '', delivered_by: '', notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    Catalog.tubes().then(setTubes).finally(() => setLoadingTubes(false));
+  }, []);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.tube_spec || !form.quantity) {
+      setErr('Selecciona el tubo e ingresa la cantidad.');
+      return;
+    }
+    setSaving(true); setErr('');
+    try {
+      await TubeReceptions.create({
+        tube_spec:    Number(form.tube_spec),
+        quantity:     Number(form.quantity),
+        delivered_by: form.delivered_by,
+        notes:        form.notes,
+        // batch: null  → recepción suelta, no asociada a lote
+      });
+      onReceived();
+    } catch (ex) {
+      setErr(ex.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400';
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-8">
+        <form onSubmit={submit}>
+          <div className="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-2">
+            <div>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">Recepción suelta</p>
+              <h2 className="text-lg font-bold text-slate-800">📥 Recibir tubería</h2>
+              <p className="text-xs text-slate-500">Material que llega sin orden de lote previa</p>
+            </div>
+            <button type="button" onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+          </div>
+
+          <div className="px-5 py-4 space-y-4">
+            {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
+
+            <div className="bg-slate-50 rounded-lg px-3 py-2 text-xs text-slate-600">
+              👤 Recibido por: <strong className="text-slate-800">{user.full_name}</strong>
+              <span className="text-slate-400 ml-2">(automático)</span>
+            </div>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                Tubo recibido
+              </span>
+              <select required className={`${inp} bg-white`}
+                disabled={loadingTubes}
+                value={form.tube_spec}
+                onChange={e => set('tube_spec', e.target.value)}>
+                <option value="">{loadingTubes ? 'Cargando…' : '— seleccionar tubo —'}</option>
+                {tubes.map(t => (
+                  <option key={t.id} value={t.id}>
+                    Ø {t.outer_diameter} × {t.thickness} mm · {t.material_display} · {t.original_length?.toFixed?.(0) || t.original_length} mm largo
+                  </option>
+                ))}
+              </select>
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                ¿No aparece? Pídele al supervisor que lo cree desde Lotes → "+ Producto".
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                Cantidad de tubos recibidos
+              </span>
+              <input type="number" min="1" required className={inp}
+                value={form.quantity}
+                onChange={e => set('quantity', e.target.value)}
+                placeholder="ej. 150"/>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                Entregado por (persona de almacén)
+              </span>
+              <input className={inp}
+                value={form.delivered_by}
+                onChange={e => set('delivered_by', e.target.value)}
+                placeholder="Nombre del personal"/>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                Notas (opcional)
+              </span>
+              <textarea rows={2} className={`${inp} resize-none`}
+                value={form.notes}
+                onChange={e => set('notes', e.target.value)}
+                placeholder="Origen, observaciones del material…"/>
+            </label>
+
+            <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              ℹ️ Esta recepción queda en el historial pero <strong>no se asocia a ningún lote</strong>.
+              Solo registra que el material entró al área.
+            </div>
+          </div>
+
+          <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-2xl">
+            <button type="button" onClick={onClose} className="btn btn-outline px-4">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn btn-success px-5">
+              {saving ? 'Registrando…' : '✓ Registrar recepción'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
   );
 }
 
