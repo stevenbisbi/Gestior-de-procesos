@@ -31,7 +31,7 @@ class ProductType(models.Model):
     PRIORITY_CHOICES = [('alta','Alta'),('media','Media'),('baja','Baja')]
 
     name              = models.CharField(max_length=100)
-    item_code         = models.CharField(max_length=50, blank=True, verbose_name='Item / SKU')
+    item_code         = models.CharField(max_length=50, blank=True, verbose_name='Item')
     tube_spec         = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='product_types')
     cut_length        = models.FloatField(verbose_name='Longitud de corte (mm)')
     client            = models.CharField(max_length=200, blank=True)
@@ -166,6 +166,30 @@ class ProductionBatch(models.Model):
         if total == 0:
             return 0
         return int((done / total) * 100)
+
+
+# ─────────────────────────────────────────────
+#  CANASTA DE TUBERÍA (recepción de materia prima)
+# ─────────────────────────────────────────────
+
+class TubeReception(models.Model):
+    """
+    Cada vez que un cortador recibe tubería cruda desde almacén, registra
+    cuántos tubos llegaron, qué especificación, quién los entregó y notas.
+    La suma por TubeSpec forma la 'canasta' disponible para cortar.
+    """
+    tube_spec    = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='receptions')
+    quantity     = models.IntegerField(verbose_name='Cantidad de tubos recibidos')
+    delivered_by = models.CharField(max_length=200, blank=True, verbose_name='Entregado por (almacén)')
+    notes        = models.TextField(blank=True)
+    received_by  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='tube_receptions')
+    received_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-received_at']
+
+    def __str__(self):
+        return f'{self.quantity}× {self.tube_spec} ({self.received_at:%Y-%m-%d})'
 
 
 # ─────────────────────────────────────────────

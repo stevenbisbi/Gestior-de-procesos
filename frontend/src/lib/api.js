@@ -102,3 +102,9 @@ export const CuttingLines = {
   update:  (id,data) => api.patch(`/cutting-lines/${id}/`, data),
   delete:  (id)      => api.delete(`/cutting-lines/${id}/`),
 };
+
+export const TubeReceptions = {
+  list:    (params = {}) => api.get('/tube-receptions/?' + new URLSearchParams(params)),
+  create:  (data)        => api.post('/tube-receptions/', data),
+  basket:  ()            => api.get('/tube-receptions/basket/'),
+};

@@ -59,7 +59,7 @@ function LineDetailModal({ line, onClose }) {
         {/* Cuerpo */}
         <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
           <Section title="Identificación">
-            <Row label="Item / SKU"  value={line.item_code} mono />
+            <Row label="Item"  value={line.item_code} mono />
             <Row label="Cliente"     value={line.client} />
             <Row label="Embalaje"    value={line.packaging} />
           </Section>

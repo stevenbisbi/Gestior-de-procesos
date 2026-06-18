@@ -342,7 +342,7 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
                     onChange={e => setProd(s => ({...s, name: e.target.value}))}
                     placeholder="Manubrio 838"/>
                 </Field>
-                <Field label="Item / SKU" hint="Código interno (ej. 877135)">
+                <Field label="Item">
                   <input className={inpCls}
                     value={prod.item_code}
                     onChange={e => setProd(s => ({...s, item_code: e.target.value}))}/>

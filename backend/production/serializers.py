@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine
+from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -22,6 +22,16 @@ class TubeSpecSerializer(serializers.ModelSerializer):
         fields = '__all__'
     def get_label(self, obj):
         return str(obj)
+
+
+class TubeReceptionSerializer(serializers.ModelSerializer):
+    tube_spec_data   = TubeSpecSerializer(source='tube_spec', read_only=True)
+    received_by_data = UserMiniSerializer(source='received_by', read_only=True)
+
+    class Meta:
+        model  = TubeReception
+        fields = '__all__'
+        read_only_fields = ['received_by', 'received_at']
 
 
 class ProductTypeSerializer(serializers.ModelSerializer):

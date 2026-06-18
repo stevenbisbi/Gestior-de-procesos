@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine
+from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception
 
 
 @admin.register(TubeSpec)
@@ -86,3 +86,12 @@ class CuttingProgramLineAdmin(admin.ModelAdmin):
     list_filter     = ['saw_type']
     search_fields   = ['product_type__name','client','tube_description']
     readonly_fields = ['batch']
+
+
+@admin.register(TubeReception)
+class TubeReceptionAdmin(admin.ModelAdmin):
+    list_display    = ['received_at','tube_spec','quantity','delivered_by','received_by']
+    list_filter     = ['tube_spec']
+    search_fields   = ['delivered_by','notes']
+    readonly_fields = ['received_at']
+    date_hierarchy  = 'received_at'

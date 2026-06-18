@@ -9,12 +9,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
 
-from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine
+from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception
 from .serializers import (TubeSpecSerializer, ProductTypeSerializer, MachineSerializer,
                           ProductionBatchSerializer, BatchListSerializer,
                           ProcessRecordSerializer, UserMiniSerializer,
                           CuttingProgramSerializer, CuttingProgramListSerializer,
-                          CuttingProgramLineSerializer)
+                          CuttingProgramLineSerializer, TubeReceptionSerializer)
 
 
 # ─── Health check (público — usado por Render) ──────────
@@ -249,6 +249,51 @@ class CuttingProgramLineViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import ValidationError
             raise ValidationError('No se puede eliminar: el lote ya inició producción.')
         instance.delete()
+
+
+# ─── Canasta de tubería (recepciones) ───────────────────
+
+class TubeReceptionViewSet(viewsets.ModelViewSet):
+    """
+    El cortador registra cada llegada de tubería desde almacén.
+    GET  /tube-receptions/         lista (filtros: ?tube_spec=ID)
+    POST /tube-receptions/         crear recepción
+    GET  /tube-receptions/basket/  vista de canasta — totales por TubeSpec
+    """
+    queryset = TubeReception.objects.select_related('tube_spec', 'received_by').all()
+    serializer_class = TubeReceptionSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        tube_spec = self.request.query_params.get('tube_spec')
+        if tube_spec:
+            qs = qs.filter(tube_spec_id=tube_spec)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(received_by=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def basket(self, request):
+        """Devuelve total de tubos disponibles por especificación."""
+        from django.db.models import Sum, Max
+        rows = (TubeReception.objects
+                .values('tube_spec')
+                .annotate(total=Sum('quantity'), last_at=Max('received_at'))
+                .order_by('-last_at'))
+        tube_ids   = [r['tube_spec'] for r in rows]
+        tube_specs = TubeSpec.objects.in_bulk(tube_ids)
+        out = []
+        for r in rows:
+            ts = tube_specs.get(r['tube_spec'])
+            if not ts:
+                continue
+            out.append({
+                'tube_spec':      TubeSpecSerializer(ts).data,
+                'total':          r['total'],
+                'last_received':  r['last_at'],
+            })
+        return Response(out)
 
 
 # ─── Dashboards ─────────────────────────────────────────
