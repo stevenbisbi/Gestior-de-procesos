@@ -23,6 +23,7 @@ import CuttingProgramList     from './pages/CuttingProgramList';
 import CuttingProgramDetail   from './pages/CuttingProgramDetail';
 import CuttingProgramOperator from './pages/CuttingProgramOperator';
 import MachinesStatus         from './pages/MachinesStatus';
+import Canasta                from './pages/Canasta';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -65,6 +66,8 @@ export default function App() {
         <Route path="/corte/programa" element={<CuttingProgramOperator />} />
         {/* Estado de máquinas */}
         <Route path="/maquinas"       element={<MachinesStatus />} />
+        {/* Canasta de tubería (cortadores + supervisor) */}
+        <Route path="/canasta"        element={<Canasta />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

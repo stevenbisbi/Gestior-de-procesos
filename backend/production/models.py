@@ -31,7 +31,7 @@ class ProductType(models.Model):
     PRIORITY_CHOICES = [('alta','Alta'),('media','Media'),('baja','Baja')]
 
     name              = models.CharField(max_length=100)
-    item_code         = models.CharField(max_length=50, blank=True, verbose_name='Item / SKU')
+    item_code         = models.CharField(max_length=50, blank=True, verbose_name='Item')
     tube_spec         = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='product_types')
     cut_length        = models.FloatField(verbose_name='Longitud de corte (mm)')
     client            = models.CharField(max_length=200, blank=True)
@@ -75,8 +75,11 @@ PROCESS_LABELS = {'corte':'Corte','chaflan':'Chaflanado','moleteo':'Moleteado','
 
 class ProductionBatch(models.Model):
     STATUS_CHOICES = [
-        ('in_basket','En canasta'),('in_process','En proceso'),
-        ('finished','Terminado'),('dispatched','Despachado'),
+        ('waiting_material', 'Esperando material'),  # creado, pero almacén no entregó tubería todavía
+        ('in_basket',  'En canasta'),                 # material recibido por el cortador, listo para cortar
+        ('in_process', 'En proceso'),
+        ('finished',   'Terminado'),
+        ('dispatched', 'Despachado'),
     ]
     PRIORITY_CHOICES = [('alta','Alta'),('media','Media'),('baja','Baja')]
 
@@ -85,7 +88,7 @@ class ProductionBatch(models.Model):
     total_quantity  = models.IntegerField()
     priority        = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='media')
     scheduled_date  = models.DateField(null=True, blank=True)
-    status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in_basket')
+    status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default='waiting_material')
     notes           = models.TextField(blank=True)
     created_by      = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='batches_created')
     created_at      = models.DateTimeField(auto_now_add=True)
@@ -122,6 +125,58 @@ class ProductionBatch(models.Model):
         prev = self.records.filter(process_type=route[idx-1]).first()
         return prev and prev.status == 'finished'
 
+    def sync_records_qty(self):
+        """
+        Reaplica total_quantity como qty_assigned a todos los procesos y recalcula
+        sus estados según lo ya producido. Se llama cuando el supervisor corrige el conteo.
+        """
+        for rec in self.records.all():
+            rec.qty_assigned = self.total_quantity
+            if rec.active_shift:
+                rec.status = 'in_process'
+            elif rec.qty_done >= self.total_quantity and rec.qty_done > 0:
+                rec.status = 'finished'
+                if not rec.finished_at:
+                    rec.finished_at = timezone.now()
+            elif rec.qty_done > 0:
+                rec.status = 'paused'
+            else:
+                rec.status = 'pending'
+            rec.save(update_fields=['qty_assigned', 'status', 'finished_at'])
+        self._recalc_status()
+
+    def _recalc_status(self):
+        """Recalcula el estado del lote a partir de sus procesos (no toca dispatched ni waiting_material)."""
+        if self.status in ('dispatched', 'waiting_material'):
+            return
+        if not self.records.exists():
+            return
+        if not self.records.exclude(status='finished').exists():
+            self.status = 'finished'
+        elif self.records.exclude(status='pending').exists():
+            self.status = 'in_process'
+        else:
+            self.status = 'in_basket'
+        self.save(update_fields=['status', 'updated_at'])
+
+    def receive_material(self, user, tube_spec=None, quantity=None, delivered_by='', notes=''):
+        """
+        El cortador confirma recepción del material → lote pasa de
+        'waiting_material' a 'in_basket' (listo para cortar).
+        Opcionalmente registra el TubeReception para inventario / auditoría.
+        """
+        from django.core.exceptions import ValidationError
+        if self.status != 'waiting_material':
+            raise ValidationError('Este lote no está esperando material.')
+        self.status = 'in_basket'
+        self.save(update_fields=['status', 'updated_at'])
+        if tube_spec and quantity:
+            TubeReception.objects.create(
+                tube_spec=tube_spec, quantity=quantity,
+                delivered_by=delivered_by or '', notes=notes or '',
+                received_by=user, batch=self,
+            )
+
     @property
     def progress_pct(self):
         """Avance ponderado real: suma de uds hechas en TODOS los procesos / total esperado."""
@@ -132,6 +187,35 @@ class ProductionBatch(models.Model):
         if total == 0:
             return 0
         return int((done / total) * 100)
+
+
+# ─────────────────────────────────────────────
+#  CANASTA DE TUBERÍA (recepción de materia prima)
+# ─────────────────────────────────────────────
+
+class TubeReception(models.Model):
+    """
+    Registro de recepción de tubería cruda desde almacén.
+    - tube_spec: qué tipo de tubo llegó
+    - quantity: cuántos
+    - batch (opcional): si la recepción fue contra un lote específico, queda enlazado
+    """
+    tube_spec    = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='receptions')
+    quantity     = models.IntegerField(verbose_name='Cantidad de tubos recibidos')
+    delivered_by = models.CharField(max_length=200, blank=True, verbose_name='Entregado por (almacén)')
+    notes        = models.TextField(blank=True)
+    received_by  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='tube_receptions')
+    received_at  = models.DateTimeField(auto_now_add=True)
+    batch        = models.ForeignKey(
+        'ProductionBatch', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='material_receptions',
+    )
+
+    class Meta:
+        ordering = ['-received_at']
+
+    def __str__(self):
+        return f'{self.quantity}× {self.tube_spec} ({self.received_at:%Y-%m-%d})'
 
 
 # ─────────────────────────────────────────────
@@ -315,8 +399,13 @@ class ProcessRecord(models.Model):
             self.batch.save(update_fields=['status', 'updated_at'])
         return entry
 
-    def end_shift(self, qty_done_this_shift, user, signature='', notes=''):
-        """Cierra el turno activo. Si se completó qty_assigned → finished, sino → paused."""
+    def end_shift(self, qty_done_this_shift, user, signature='', notes='', finalize=False):
+        """
+        Cierra el turno activo.
+        - Si total >= qty_assigned → finished
+        - Si finalize=True → finished aunque falten unidades (merma/material perdido)
+        - Sino → paused (queda disponible para otro operario)
+        """
         from django.core.exceptions import ValidationError
         from django.db.models import Sum
         active = self.active_shift
@@ -334,7 +423,7 @@ class ProcessRecord(models.Model):
         self.qty_done   = total
         self.signature  = signature  # firma del último turno (legacy)
 
-        if total >= self.qty_assigned:
+        if total >= self.qty_assigned or finalize:
             self.status      = 'finished'
             self.finished_at = active.finished_at
         else:

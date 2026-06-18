@@ -61,10 +61,10 @@ if not User.objects.filter(username='supervisor').exists():
 sup = User.objects.get(username='supervisor')
 
 users_data = [
-    ('juan',   'Juan',   'Pérez',   op_group),
-    ('maria',  'María',  'López',   op_group),
-    ('pedro',  'Pedro',  'Ramírez', op_group),
-    ('camila', 'Camila', 'Torres',  op_group),
+    ('operario1', 'Operario', '1', op_group),
+    ('operario2', 'Operario', '2', op_group),
+    ('operario3', 'Operario', '3', op_group),
+    ('operario4', 'Operario', '4', op_group),
 ]
 U = {}
 for uname, fn, ln, grp in users_data:
@@ -76,14 +76,17 @@ for uname, fn, ln, grp in users_data:
         print(f"✓ {uname} / op1234")
     U[uname] = User.objects.get(username=uname)
 
-# ── Especificaciones de tubo ─────────────────────────────────────────────────
+# ── Especificaciones de tubo (extraídas del programa real de la planta) ──────
 tubes_data = [
-    ('round',  '22.2', 1.6, 'hr',  6000),
-    ('round',  '19.1', 1.2, 'hr',  6000),
-    ('round',  '25.4', 1.6, 'hr',  6000),
-    ('round',  '31.8', 1.6, 'hr',  6000),
-    ('square', '25.4', 1.6, 'hr',  6000),
-    ('round',  '28.6', 1.6, 'cr',  6000),
+    # (shape, outer_diameter, thickness, material, original_length)
+    ('round',  '5/8',    0.7, 'cr',     6000),  # TUB CR REDONDO 5/8
+    ('round',  '3/4',    0.7, 'cr',     6000),  # TUB CR REDONDO 3/4
+    ('round',  '1/2',    0.6, 'cr',     6000),  # TUB CR REDONDO 1/2
+    ('round',  '22.2',   2.0, 'cr',     6000),  # TUBO 22.2 CAL 2.0 (manubrios)
+    ('round',  '25.4',   1.5, 'cr',     6000),  # TUBO 25.4 CAL 1.5
+    ('round',  '15.88',  2.0, 'hr_est', 6000),  # TUBO 15.88 HR EST CAL 2.0
+    ('square', '20x40',  1.6, 'cr',     6000),  # TUBO RECTANGULAR 20x40 EC SPFC 390
+    ('round',  '6.35',   1.0, 'cr',     6000),  # BARRA CALIBRADA 1016
 ]
 T = {}
 for sh, od, th, mat, lg in tubes_data:
@@ -93,22 +96,35 @@ for sh, od, th, mat, lg in tubes_data:
     )
     T[f'{od}x{th}'] = t
 
-# ── Tipos de producto ────────────────────────────────────────────────────────
+# ── Tipos de producto (productos reales del programa Bewo) ───────────────────
+# (name, item_code, tube_key, cut_length, chaflan, moleteo, curvado, client, priority, saw, rpm)
 prods_data = [
-    ('Manubrio 838',    '22.2x1.6',  838, True,  True,  True,  'Cliente A', 'alta',  'hss', 1800),
-    ('Manubrio 874',    '22.2x1.6',  874, True,  True,  True,  'Cliente A', 'media', 'hss', 1800),
-    ('Defensa 900',     '22.2x1.6',  900, False, False, True,  'Cliente B', 'media', 'tct', 2200),
-    ('Defensa 1000',    '31.8x1.6', 1000, False, False, True,  'Cliente B', 'baja',  'tct', 1600),
-    ('Tubo corte 650',  '19.1x1.2',  650, False, False, False, 'Cliente C', 'baja',  'hss', 2400),
-    ('Tubo corte 910',  '25.4x1.6',  910, False, False, False, 'Cliente D', 'media', 'tct', 2000),
-    ('Manubrio 920',    '22.2x1.6',  920, True,  True,  True,  'Cliente A', 'alta',  'hss', 1800),
-    ('Cuadrado 750',    '25.4x1.6',  750, True,  False, False, 'Cliente E', 'media', 'tct', 1400),
-    ('Horquilla 1100',  '28.6x1.6', 1100, True,  False, True,  'Cliente F', 'alta',  'hss', 1600),
+    # ── Productos para manubrios — ruta completa (corte + chaflan + moleteo + curvado) ──
+    ('TUBO 22.2 CAL 2.0 x 911mm CUR',          '277234', '22.2x2.0',   911, True,  True,  True,  'MotoPartes',                'alta',  'hss', 1800),
+    ('TUBO 22.2 CAL 2.0 x 874mm CUR',          '236570', '22.2x2.0',   874, True,  True,  True,  'MotoPartes',                'media', 'hss', 1800),
+    ('TUBO 22.2 CAL 2.0 x 920mm CUR',          '255330', '22.2x2.0',   920, True,  True,  True,  'MotoPartes',                'alta',  'hss', 1800),
+    # ── Tubos con chaflanado + moleteado (sin curvado) ──
+    ('TUBO 22.2 CAL 2.0 x 837mm',              '236564', '22.2x2.0',   837, True,  True,  False, 'MotoPartes',                'media', 'hss', 1800),
+    ('TUBO 22.2 CAL 2.0 x 385mm PIPE REAR',    '358393', '22.2x2.0',   385, True,  True,  False, 'MotoPartes (CB125 New)',    'alta',  'hss', 1800),
+    # ── Tubos con corte + curvado (defensas) ──
+    ('TUBO 22.2 CAL 2.0 x 905mm',              '255321', '22.2x2.0',   905, False, False, True,  'MotoPartes (DIO)',          'media', 'hss', 1800),
+    ('TUBO 25.4 CAL 1.5 x 843mm',              '328671', '25.4x1.5',   843, False, False, True,  'MotoPartes (Yamaha)',       'media', 'tct', 2000),
+    # ── Tubos con corte + chaflanado (sin moleteo ni curvado) ──
+    ('TUBO 22.2 CAL 2.0 x 766mm',              '282120', '22.2x2.0',   766, True,  False, False, 'MotoPartes (Tibsa CR-125)', 'media', 'hss', 1800),
+    # ── Cortes simples (solo corte) ──
+    ('TUB CR REDONDO 5/8 x 0.7 x 880mm',       '877135', '5/8x0.7',    880, False, False, False, 'Infantiles ABBA Limitada',  'media', 'hss', 2400),
+    ('TUB CR REDONDO 3/4 x 0.7 x 250mm',       '877136', '3/4x0.7',    250, False, False, False, 'Infantiles ABBA Limitada',  'media', 'hss', 2400),
+    ('TUB CR REDONDO 3/4 x 0.7 x 180mm',       '877137', '3/4x0.7',    180, False, False, False, 'Infantiles ABBA Limitada',  'baja',  'hss', 2400),
+    ('TUB CR REDONDO 1/2 x 0.6 x 254mm',       '877138', '1/2x0.6',    254, False, False, False, 'Rejillas Plásticos S.A.',   'baja',  'hss', 2600),
+    ('TUBO 15.88 HR EST CAL 2.0 x 327mm',      '357777', '15.88x2.0',  327, False, False, False, 'MotoPartes (Viga Trans.)',  'baja',  'hss', 2200),
+    ('TUBO RECT 20x40 EC SPFC 1.6 x 657.5mm',  '281020', '20x40x1.6',  657, False, False, False, 'MotoPartes',                'media', 'tct', 1600),
+    ('TUBO RECT 20x40 EC SPFC 1.6 x 343mm',    '358395', '20x40x1.6',  343, False, False, False, 'MotoPartes',                'media', 'tct', 1600),
+    ('BARRA CALIBRADA 1016 x 6.35 x 201mm',    '277277', '6.35x1.0',   201, False, False, False, 'C. Marlets',                'baja',  'hss', 2400),
 ]
 P = {}
-for nm, tk, cl, ch, mo, cu, cli, pr, sw, rpm in prods_data:
+for nm, item, tk, cl, ch, mo, cu, cli, pr, sw, rpm in prods_data:
     obj, _ = ProductType.objects.get_or_create(name=nm, defaults={
-        'tube_spec': T[tk], 'cut_length': cl,
+        'tube_spec': T[tk], 'item_code': item, 'cut_length': cl,
         'requires_chaflan': ch, 'requires_moleteo': mo, 'requires_curvado': cu,
         'client': cli, 'default_priority': pr, 'saw_type': sw, 'rpm': rpm,
     })
@@ -116,12 +132,12 @@ for nm, tk, cl, ch, mo, cu, cli, pr, sw, rpm in prods_data:
 
 # ── Máquinas ─────────────────────────────────────────────────────────────────
 machines_data = [
-    ('Bewo 1',        'corte',   ['juan', 'pedro']),
-    ('Bewo 2',        'corte',   ['juan', 'pedro']),
-    ('Chaflaneadora', 'chaflan', ['maria']),
-    ('Moleteadora',   'moleteo', ['maria']),
-    ('Socco 1',       'curvado', ['juan', 'camila']),
-    ('Socco 2',       'curvado', ['pedro', 'camila']),
+    ('Bewo 1',        'corte',   ['operario1', 'operario3']),
+    ('Bewo 2',        'corte',   ['operario1', 'operario3']),
+    ('Chaflaneadora', 'chaflan', ['operario2']),
+    ('Moleteadora',   'moleteo', ['operario2']),
+    ('Socco 1',       'curvado', ['operario1', 'operario4']),
+    ('Socco 2',       'curvado', ['operario3', 'operario4']),
 ]
 M = {}
 for n, pt, ops in machines_data:
@@ -254,220 +270,248 @@ def mark_batch_status(batch):
 
 print("=== Creando lotes ===\n")
 
-# ══════════════════════════════════════════════════════════════════
-# 1. Manubrio 838 — TERMINADO (4 procesos completos)
-# ══════════════════════════════════════════════════════════════════
-b1 = make_batch(P['Manubrio 838'], 500, 'alta', -2, sup)
-r1c  = setup_process(b1, 'corte',   'finished', [(U['juan'],   M['Bewo 1'],        'A', 500, 13, 12)])
-r1ch = setup_process(b1, 'chaflan', 'finished', [(U['maria'],  M['Chaflaneadora'], 'A', 498, 12, 11)])
-r1m  = setup_process(b1, 'moleteo', 'finished', [(U['maria'],  M['Moleteadora'],   'A', 498, 11, 10)])
-r1cu = setup_process(b1, 'curvado', 'finished', [(U['camila'], M['Socco 1'],       'B', 498, 10, 10)])
-mark_batch_status(b1)
-make_qc(r1c, 13, 'T1', 'Cliente A', 'Manubrio 838', 'Honda CG 150',
-        'si', 'hr', 'si', 'HSS Ø22.2', '1800 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '838.1', '837.9', '838.2', '', U['juan'])
-make_logs(r1c, U['juan'], [
-    {'piece': i, 'l1': 'Longitud (mm)', 'v1': v, 'result': 'conforme'}
-    for i, v in enumerate(['838.1','837.9','838.0','838.3','838.2','837.8','838.4','838.1'], 1)
-])
-print(f"✓ {b1.batch_code}  Manubrio 838 — Terminado")
+# Atajos a los productos por su descripción real
+PROD_911       = P['TUBO 22.2 CAL 2.0 x 911mm CUR']
+PROD_874       = P['TUBO 22.2 CAL 2.0 x 874mm CUR']
+PROD_920       = P['TUBO 22.2 CAL 2.0 x 920mm CUR']
+PROD_837       = P['TUBO 22.2 CAL 2.0 x 837mm']
+PROD_385       = P['TUBO 22.2 CAL 2.0 x 385mm PIPE REAR']
+PROD_905       = P['TUBO 22.2 CAL 2.0 x 905mm']
+PROD_843       = P['TUBO 25.4 CAL 1.5 x 843mm']
+PROD_766       = P['TUBO 22.2 CAL 2.0 x 766mm']
+PROD_580_5_8   = P['TUB CR REDONDO 5/8 x 0.7 x 880mm']
+PROD_250_3_4   = P['TUB CR REDONDO 3/4 x 0.7 x 250mm']
+PROD_180_3_4   = P['TUB CR REDONDO 3/4 x 0.7 x 180mm']
+PROD_254_1_2   = P['TUB CR REDONDO 1/2 x 0.6 x 254mm']
+PROD_15_88     = P['TUBO 15.88 HR EST CAL 2.0 x 327mm']
+PROD_RECT_657  = P['TUBO RECT 20x40 EC SPFC 1.6 x 657.5mm']
+PROD_RECT_343  = P['TUBO RECT 20x40 EC SPFC 1.6 x 343mm']
+PROD_BARRA     = P['BARRA CALIBRADA 1016 x 6.35 x 201mm']
 
 # ══════════════════════════════════════════════════════════════════
-# 2. Manubrio 874 — DESPACHADO
+# 1. Manubrio 22.2x911 CUR — TERMINADO (4 procesos completos)
 # ══════════════════════════════════════════════════════════════════
-b2 = make_batch(P['Manubrio 874'], 300, 'media', -5, sup)
-r2c  = setup_process(b2, 'corte',   'finished', [(U['pedro'],  M['Bewo 2'],        'B', 300, 20, 18)])
-r2ch = setup_process(b2, 'chaflan', 'finished', [(U['maria'],  M['Chaflaneadora'], 'A', 298, 18, 17)])
-r2m  = setup_process(b2, 'moleteo', 'finished', [(U['maria'],  M['Moleteadora'],   'B', 298, 17, 16)])
-r2cu = setup_process(b2, 'curvado', 'finished', [(U['camila'], M['Socco 2'],       'A', 296, 16, 15)])
+b1 = make_batch(PROD_911, 500, 'alta', -2, sup)
+r1c  = setup_process(b1, 'corte',   'finished', [(U['operario1'], M['Bewo 1'],        'A', 500, 13, 12)])
+r1ch = setup_process(b1, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'A', 498, 12, 11)])
+r1m  = setup_process(b1, 'moleteo', 'finished', [(U['operario2'], M['Moleteadora'],   'A', 498, 11, 10)])
+r1cu = setup_process(b1, 'curvado', 'finished', [(U['operario4'], M['Socco 1'],       'B', 498, 10, 10)])
+mark_batch_status(b1)
+make_qc(r1c, 13, 'T1', 'MotoPartes', '277234', 'Honda CG 150',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
+        'verificado', 'conforme', 'NA', 'no_aplica',
+        '911.1', '910.9', '911.2', '', U['operario1'])
+make_logs(r1c, U['operario1'], [
+    {'piece': i, 'l1': 'Longitud (mm)', 'v1': v, 'result': 'conforme'}
+    for i, v in enumerate(['911.1','910.9','911.0','911.3','911.2','910.8','911.4','911.1'], 1)
+])
+print(f"✓ {b1.batch_code}  TUBO 22.2 x 911mm CUR — Terminado")
+
+# ══════════════════════════════════════════════════════════════════
+# 2. Manubrio 22.2x874 CUR — DESPACHADO
+# ══════════════════════════════════════════════════════════════════
+b2 = make_batch(PROD_874, 300, 'media', -5, sup)
+r2c  = setup_process(b2, 'corte',   'finished', [(U['operario3'], M['Bewo 2'],        'B', 300, 20, 18)])
+r2ch = setup_process(b2, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'A', 298, 18, 17)])
+r2m  = setup_process(b2, 'moleteo', 'finished', [(U['operario2'], M['Moleteadora'],   'B', 298, 17, 16)])
+r2cu = setup_process(b2, 'curvado', 'finished', [(U['operario4'], M['Socco 2'],       'A', 296, 16, 15)])
 mark_batch_status(b2)
 dispatch_batch(b2, 14)
-make_qc(r2c, 20, 'T2', 'Cliente A', 'Manubrio 874', 'Honda XR 190',
-        'si', 'hr', 'si', 'HSS Ø22.2', '1800 RPM',
+make_qc(r2c, 20, 'T2', 'MotoPartes', '236570', 'Honda XR 190',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '874.0', '873.8', '874.2', '', U['pedro'])
-print(f"✓ {b2.batch_code}  Manubrio 874 — Despachado")
+        '874.0', '873.8', '874.2', '', U['operario3'])
+print(f"✓ {b2.batch_code}  TUBO 22.2 x 874mm CUR — Despachado")
 
 # ══════════════════════════════════════════════════════════════════
-# 3. Defensa 900 — DESPACHADO
+# 3. Defensa 22.2x905 — DESPACHADO
 # ══════════════════════════════════════════════════════════════════
-b3 = make_batch(P['Defensa 900'], 200, 'media', -8, sup)
-r3c  = setup_process(b3, 'corte',   'finished', [(U['juan'],   M['Bewo 1'],  'A', 200, 22, 21)])
-r3cu = setup_process(b3, 'curvado', 'finished', [(U['camila'], M['Socco 1'], 'A', 200, 21, 20)])
+b3 = make_batch(PROD_905, 200, 'media', -8, sup)
+r3c  = setup_process(b3, 'corte',   'finished', [(U['operario1'], M['Bewo 1'],  'A', 200, 22, 21)])
+r3cu = setup_process(b3, 'curvado', 'finished', [(U['operario4'], M['Socco 1'], 'A', 200, 21, 20)])
 mark_batch_status(b3)
 dispatch_batch(b3, 19)
-make_qc(r3c, 22, 'T1', 'Cliente B', 'Defensa 900', 'Honda CB 250',
-        'si', 'hr', 'si', 'TCT Ø22.2', '2200 RPM',
+make_qc(r3c, 22, 'T1', 'MotoPartes (DIO)', '255321', 'Honda DIO',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '900.1', '899.9', '900.0', '', U['juan'])
-print(f"✓ {b3.batch_code}  Defensa 900 — Despachado")
+        '905.1', '904.9', '905.0', '', U['operario1'])
+print(f"✓ {b3.batch_code}  TUBO 22.2 x 905mm — Despachado")
 
 # ══════════════════════════════════════════════════════════════════
-# 4. Tubo corte 650 — TERMINADO
+# 4. TUB CR REDONDO 5/8 x 880mm — TERMINADO (corte simple)
 # ══════════════════════════════════════════════════════════════════
-b4 = make_batch(P['Tubo corte 650'], 1000, 'baja', -1, U['juan'])
-r4c = setup_process(b4, 'corte', 'finished', [(U['pedro'], M['Bewo 2'], 'C', 1000, 8, 7)])
+b4 = make_batch(PROD_580_5_8, 1000, 'baja', -1, U['operario1'])
+r4c = setup_process(b4, 'corte', 'finished', [(U['operario3'], M['Bewo 2'], 'C', 1000, 8, 7)])
 mark_batch_status(b4)
-make_qc(r4c, 8, 'T3', 'Cliente C', 'Tubo 650', 'Varias',
-        'si', 'hr', 'si', 'HSS Ø19.1', '2400 RPM',
+make_qc(r4c, 8, 'T3', 'Infantiles ABBA Limitada', '877135', 'Triciclo IA-200',
+        'si', 'cr', 'si', 'HSS Ø5/8', '2400 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '650.0', '649.8', '650.1', 'Lote de tubos simples', U['pedro'])
-print(f"✓ {b4.batch_code}  Tubo corte 650 — Terminado")
+        '880.0', '879.8', '880.1', 'Tubería para tricilo infantil', U['operario3'])
+print(f"✓ {b4.batch_code}  TUB CR REDONDO 5/8 x 880mm — Terminado")
 
 # ══════════════════════════════════════════════════════════════════
-# 5. Manubrio 920 — TERMINADO con corte hecho en 2 turnos (handoff)
+# 5. Manubrio 22.2x920 CUR — TERMINADO (corte en 2 turnos handoff)
 # ══════════════════════════════════════════════════════════════════
-b5 = make_batch(P['Manubrio 920'], 400, 'alta', -1, sup, 'Pedido urgente Cliente A')
-# Corte: Juan cerró su turno con 200, Pedro continuó y terminó las 200 restantes
+b5 = make_batch(PROD_920, 400, 'alta', -1, sup, 'Pedido urgente MotoPartes')
+# Corte: Operario 1 cerró su turno con 200, Operario 3 continuó y terminó las 200 restantes
 r5c  = setup_process(b5, 'corte', 'finished', [
-    (U['juan'],  M['Bewo 1'], 'A', 200, 9, 9),
-    (U['pedro'], M['Bewo 1'], 'B', 200, 9, 8),
+    (U['operario1'], M['Bewo 1'], 'A', 200, 9, 9),
+    (U['operario3'], M['Bewo 1'], 'B', 200, 9, 8),
 ])
-r5ch = setup_process(b5, 'chaflan', 'finished', [(U['maria'],  M['Chaflaneadora'], 'B', 398, 8, 7)])
-r5m  = setup_process(b5, 'moleteo', 'finished', [(U['maria'],  M['Moleteadora'],   'A', 398, 7, 6)])
-r5cu = setup_process(b5, 'curvado', 'finished', [(U['pedro'],  M['Socco 2'],       'B', 395, 6, 5)])
+r5ch = setup_process(b5, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'B', 398, 8, 7)])
+r5m  = setup_process(b5, 'moleteo', 'finished', [(U['operario2'], M['Moleteadora'],   'A', 398, 7, 6)])
+r5cu = setup_process(b5, 'curvado', 'finished', [(U['operario3'], M['Socco 2'],       'B', 395, 6, 5)])
 mark_batch_status(b5)
-make_qc(r5c, 9, 'T1', 'Cliente A', 'Manubrio 920', 'Honda XR 250',
-        'si', 'hr', 'si', 'HSS Ø22.2', '1800 RPM',
+make_qc(r5c, 9, 'T1', 'MotoPartes', '255330', 'Honda XR 250',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '920.0', '919.9', '920.2', 'Pedido urgente revisado', U['juan'])
-print(f"✓ {b5.batch_code}  Manubrio 920 — Terminado (corte en 2 turnos)")
+        '920.0', '919.9', '920.2', 'Pedido urgente revisado', U['operario1'])
+print(f"✓ {b5.batch_code}  TUBO 22.2 x 920mm CUR — Terminado (corte en 2 turnos)")
 
 # ══════════════════════════════════════════════════════════════════
-# 6. Tubo corte 910 — TERMINADO
+# 6. TUBO RECT 20x40 x 343mm — TERMINADO (corte simple)
 # ══════════════════════════════════════════════════════════════════
-b6 = make_batch(P['Tubo corte 910'], 800, 'media', 2, U['pedro'])
-r6c = setup_process(b6, 'corte', 'finished', [(U['juan'], M['Bewo 1'], 'A', 800, 6, 5)])
+b6 = make_batch(PROD_RECT_343, 800, 'media', 2, U['operario3'])
+r6c = setup_process(b6, 'corte', 'finished', [(U['operario1'], M['Bewo 1'], 'A', 800, 6, 5)])
 mark_batch_status(b6)
-make_qc(r6c, 6, 'T1', 'Cliente D', 'Tubo 910', 'Varias',
-        'si', 'hr', 'si', 'TCT Ø25.4', '2000 RPM',
+make_qc(r6c, 6, 'T1', 'MotoPartes', '358395', 'Varias',
+        'si', 'cr', 'si', 'TCT 20x40', '1600 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '910.1', '910.0', '909.9', '', U['juan'])
-print(f"✓ {b6.batch_code}  Tubo corte 910 — Terminado")
+        '343.1', '343.0', '342.9', '', U['operario1'])
+print(f"✓ {b6.batch_code}  TUBO RECT 20x40 x 343mm — Terminado")
 
 # ══════════════════════════════════════════════════════════════════
-# 7. Manubrio 838 — EN PROCESO (corte ✓, chaflan en proceso por María)
+# 7. TUBO 22.2 x 911mm CUR — EN PROCESO (corte ✓, chaflan activo)
 # ══════════════════════════════════════════════════════════════════
-b7 = make_batch(P['Manubrio 838'], 600, 'alta', 1, sup)
-r7c  = setup_process(b7, 'corte', 'finished', [(U['pedro'], M['Bewo 2'], 'A', 600, 4, 3)])
-# Chaflan: María lleva 200 en su turno actual (sin cerrar)
+b7 = make_batch(PROD_911, 600, 'alta', 1, sup)
+r7c  = setup_process(b7, 'corte', 'finished', [(U['operario3'], M['Bewo 2'], 'A', 600, 4, 3)])
+# Chaflan: Operario 2 lleva 200 en su turno actual (sin cerrar)
 r7ch = b7.records.get(process_type='chaflan')
-add_shift(r7ch, U['maria'], M['Chaflaneadora'], 'A', 200, 1, None)  # turno activo
+add_shift(r7ch, U['operario2'], M['Chaflaneadora'], 'A', 200, 1, None)  # turno activo
 finalize_record(r7ch, 'in_process')
 mark_batch_status(b7)
-make_qc(r7c, 4, 'T1', 'Cliente A', 'Manubrio 838', 'Honda CG 150',
-        'si', 'hr', 'si', 'HSS Ø22.2', '1800 RPM',
+make_qc(r7c, 4, 'T1', 'MotoPartes', '277234', 'Honda CG 150',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '838.0', '838.1', '837.9', '', U['pedro'])
-print(f"✓ {b7.batch_code}  Manubrio 838 — En proceso (chaflanado activo, 200/600)")
+        '911.0', '911.1', '910.9', '', U['operario3'])
+print(f"✓ {b7.batch_code}  TUBO 22.2 x 911mm CUR — En proceso (chaflanado 200/600)")
 
 # ══════════════════════════════════════════════════════════════════
-# 8. Defensa 1000 — PAUSADO en corte (Juan cerró turno con 80/150)
+# 8. TUBO 25.4 x 843mm — PAUSADO en corte (operario1 cerró 80/150)
 # ══════════════════════════════════════════════════════════════════
-b8 = make_batch(P['Defensa 1000'], 150, 'media', 3, U['camila'])
+b8 = make_batch(PROD_843, 150, 'media', 3, U['operario4'])
 r8c = b8.records.get(process_type='corte')
-add_shift(r8c, U['juan'], M['Bewo 1'], 'B', 80, 1, 1)  # turno cerrado parcial
+add_shift(r8c, U['operario1'], M['Bewo 1'], 'B', 80, 1, 1)  # turno cerrado parcial
 finalize_record(r8c, 'paused')
 mark_batch_status(b8)
-make_qc(r8c, 1, 'T2', 'Cliente B', 'Defensa 1000', 'Honda Tornado',
-        'si', 'hr', 'si', 'TCT Ø31.8', '1600 RPM',
+make_qc(r8c, 1, 'T2', 'MotoPartes (Yamaha)', '328671', 'Yamaha YZ 150',
+        'si', 'cr', 'si', 'TCT Ø25.4', '2000 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '1000.2', '1000.0', '999.8', 'Cierre de turno - faltan 70 uds', U['juan'])
-print(f"✓ {b8.batch_code}  Defensa 1000 — Pausado (corte 80/150, esperando relevo)")
+        '843.2', '843.0', '842.8', 'Cierre de turno - faltan 70 uds', U['operario1'])
+print(f"✓ {b8.batch_code}  TUBO 25.4 x 843mm — Pausado (corte 80/150, esperando relevo)")
 
 # ══════════════════════════════════════════════════════════════════
-# 9. Manubrio 874 — EN PROCESO (corte ✓, chaflan ✓, moleteo PAUSADO)
+# 9. TUBO 22.2 x 874mm CUR — EN PROCESO (corte ✓, chaflan ✓, moleteo PAUSADO)
 # ══════════════════════════════════════════════════════════════════
-b9 = make_batch(P['Manubrio 874'], 450, 'alta', 0, sup, 'Segunda corrida Cliente A')
-r9c  = setup_process(b9, 'corte',   'finished', [(U['pedro'], M['Bewo 2'],        'A', 450, 5, 4)])
-r9ch = setup_process(b9, 'chaflan', 'finished', [(U['maria'], M['Chaflaneadora'], 'B', 448, 4, 3)])
-# Moleteo: María hizo 250 y cerró turno (queda pausado)
+b9 = make_batch(PROD_874, 450, 'alta', 0, sup, 'Segunda corrida MotoPartes')
+r9c  = setup_process(b9, 'corte',   'finished', [(U['operario3'], M['Bewo 2'],        'A', 450, 5, 4)])
+r9ch = setup_process(b9, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'B', 448, 4, 3)])
+# Moleteo: Operario 2 hizo 250 y cerró turno (queda pausado)
 r9m = b9.records.get(process_type='moleteo')
-add_shift(r9m, U['maria'], M['Moleteadora'], 'A', 250, 2, 2)
+add_shift(r9m, U['operario2'], M['Moleteadora'], 'A', 250, 2, 2)
 finalize_record(r9m, 'paused')
 mark_batch_status(b9)
-make_qc(r9c, 5, 'T2', 'Cliente A', 'Manubrio 874', 'Honda XR 190',
-        'si', 'hr', 'si', 'HSS Ø22.2', '1800 RPM',
+make_qc(r9c, 5, 'T2', 'MotoPartes', '236570', 'Honda XR 190',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '874.1', '874.0', '873.9', '', U['pedro'])
-print(f"✓ {b9.batch_code}  Manubrio 874 — En proceso (moleteo pausado 250/450)")
+        '874.1', '874.0', '873.9', '', U['operario3'])
+print(f"✓ {b9.batch_code}  TUBO 22.2 x 874mm CUR — En proceso (moleteo pausado 250/450)")
 
 # ══════════════════════════════════════════════════════════════════
-# 10. Tubo corte 910 — EN PROCESO (corte activo por Juan)
+# 10. TUB CR REDONDO 3/4 x 250mm — EN PROCESO (corte activo)
 # ══════════════════════════════════════════════════════════════════
-b10 = make_batch(P['Tubo corte 910'], 500, 'media', 2, U['juan'])
+b10 = make_batch(PROD_250_3_4, 500, 'media', 2, U['operario1'])
 r10c = b10.records.get(process_type='corte')
-add_shift(r10c, U['juan'], M['Bewo 1'], 'C', 120, 1, None)  # turno activo
+add_shift(r10c, U['operario1'], M['Bewo 1'], 'C', 120, 1, None)  # turno activo
 finalize_record(r10c, 'in_process')
 mark_batch_status(b10)
-make_qc(r10c, 1, 'T3', 'Cliente D', 'Tubo 910', 'Varias',
-        'si', 'hr', 'si', 'TCT Ø25.4', '2000 RPM',
+make_qc(r10c, 1, 'T3', 'Infantiles ABBA Limitada', '877136', 'Triciclo IA-200',
+        'si', 'cr', 'si', 'HSS Ø3/4', '2400 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '910.0', '910.1', '910.2', 'Turno nocturno, revisión inicial OK', U['juan'])
-print(f"✓ {b10.batch_code}  Tubo corte 910 — En proceso (corte activo, 120/500)")
+        '250.0', '250.1', '250.2', 'Turno nocturno, revisión inicial OK', U['operario1'])
+print(f"✓ {b10.batch_code}  TUB CR REDONDO 3/4 x 250mm — En proceso (corte 120/500)")
 
 # ══════════════════════════════════════════════════════════════════
-# 11. Horquilla 1100 — EN PROCESO (curvado activo por Camila)
+# 11. TUBO 22.2 x 385mm PIPE REAR — EN PROCESO (corte ✓, chaflan ✓, moleteo activo)
 # ══════════════════════════════════════════════════════════════════
-b11 = make_batch(P['Horquilla 1100'], 250, 'alta', 1, sup)
-r11c  = setup_process(b11, 'corte',   'finished', [(U['pedro'], M['Bewo 2'],        'B', 250, 4, 3)])
-r11ch = setup_process(b11, 'chaflan', 'finished', [(U['maria'], M['Chaflaneadora'], 'A', 248, 3, 2)])
-r11cu = b11.records.get(process_type='curvado')
-add_shift(r11cu, U['camila'], M['Socco 2'], 'B', 80, 1, None)  # turno activo
-finalize_record(r11cu, 'in_process')
+b11 = make_batch(PROD_385, 250, 'alta', 1, sup)
+r11c  = setup_process(b11, 'corte',   'finished', [(U['operario3'], M['Bewo 2'],        'B', 250, 4, 3)])
+r11ch = setup_process(b11, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'A', 248, 3, 2)])
+r11m  = b11.records.get(process_type='moleteo')
+add_shift(r11m, U['operario2'], M['Moleteadora'], 'B', 80, 1, None)  # turno activo
+finalize_record(r11m, 'in_process')
 mark_batch_status(b11)
-make_qc(r11c, 4, 'T2', 'Cliente F', 'Horquilla 1100', 'Yamaha FZ 150',
-        'si', 'cr', 'si', 'HSS Ø28.6', '1600 RPM',
+make_qc(r11c, 4, 'T2', 'MotoPartes (CB125 New)', '358393', 'Honda CB125 New',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '1100.0', '1099.8', '1100.1', '', U['pedro'])
-print(f"✓ {b11.batch_code}  Horquilla 1100 — En proceso (curvado activo, 80/250)")
+        '385.0', '384.8', '385.1', '', U['operario3'])
+print(f"✓ {b11.batch_code}  TUBO 22.2 x 385mm PIPE REAR — En proceso (moleteo 80/250)")
 
 # ══════════════════════════════════════════════════════════════════
-# 12. Cuadrado 750 — EN PROCESO (chaflan activo por María)
+# 12. TUBO 22.2 x 766mm — EN PROCESO (corte ✓, chaflan activo)
 # ══════════════════════════════════════════════════════════════════
-b12 = make_batch(P['Cuadrado 750'], 350, 'media', 4, U['maria'])
-r12c = setup_process(b12, 'corte', 'finished', [(U['juan'], M['Bewo 1'], 'A', 350, 2, 1)])
+b12 = make_batch(PROD_766, 350, 'media', 4, U['operario2'])
+r12c = setup_process(b12, 'corte', 'finished', [(U['operario1'], M['Bewo 1'], 'A', 350, 2, 1)])
 r12ch = b12.records.get(process_type='chaflan')
-add_shift(r12ch, U['maria'], M['Chaflaneadora'], 'B', 100, 1, None)  # turno activo
+add_shift(r12ch, U['operario2'], M['Chaflaneadora'], 'B', 100, 1, None)  # turno activo
 finalize_record(r12ch, 'in_process')
 mark_batch_status(b12)
-make_qc(r12c, 2, 'T1', 'Cliente E', 'Cuadrado 750', 'Especial',
-        'si', 'hr', 'si', 'TCT Ø25.4', '1400 RPM',
+make_qc(r12c, 2, 'T1', 'MotoPartes (Tibsa CR-125)', '282120', 'CR-125 New',
+        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
         'verificado', 'conforme', 'NA', 'no_aplica',
-        '750.1', '750.0', '749.9', 'Tubo cuadrado, verificar escuadra', U['juan'])
-print(f"✓ {b12.batch_code}  Cuadrado 750 — En proceso (chaflanado activo, 100/350)")
+        '766.1', '766.0', '765.9', '', U['operario1'])
+print(f"✓ {b12.batch_code}  TUBO 22.2 x 766mm — En proceso (chaflanado 100/350)")
 
 # ══════════════════════════════════════════════════════════════════
 # 13–18. Lotes EN CANASTA (sin procesos iniciados)
 # ══════════════════════════════════════════════════════════════════
-b13 = make_batch(P['Defensa 900'],    175, 'baja',  7, sup)
-b14 = make_batch(P['Manubrio 838'],   280, 'media', 5, sup)
-b15 = make_batch(P['Tubo corte 650'], 750, 'baja', 10, U['pedro'])
-b16 = make_batch(P['Defensa 1000'],   200, 'media', 8, sup, 'Revisar tolerancias antes de iniciar')
-b17 = make_batch(P['Horquilla 1100'], 120, 'alta',  3, sup, 'Pedido prioritario Cliente F')
-b18 = make_batch(P['Cuadrado 750'],   400, 'baja', 14, U['juan'])
-for b, label in [(b13,'Defensa 900'),(b14,'Manubrio 838'),(b15,'Tubo corte 650'),
-                 (b16,'Defensa 1000'),(b17,'Horquilla 1100'),(b18,'Cuadrado 750')]:
+b13 = make_batch(PROD_180_3_4,  175, 'baja',  7, sup)
+b14 = make_batch(PROD_837,      280, 'media', 5, sup)
+b15 = make_batch(PROD_254_1_2,  750, 'baja', 10, U['operario3'])
+b16 = make_batch(PROD_15_88,    200, 'media', 8, sup, 'Revisar tolerancias antes de iniciar')
+b17 = make_batch(PROD_RECT_657, 120, 'alta',  3, sup, 'Pedido prioritario MotoPartes')
+b18 = make_batch(PROD_BARRA,    400, 'baja', 14, U['operario1'])
+for b, label in [(b13,'TUB CR REDONDO 3/4 x 180mm'),
+                 (b14,'TUBO 22.2 x 837mm'),
+                 (b15,'TUB CR REDONDO 1/2 x 254mm'),
+                 (b16,'TUBO 15.88 HR EST x 327mm'),
+                 (b17,'TUBO RECT 20x40 x 657.5mm'),
+                 (b18,'BARRA CALIBRADA 1016 x 201mm')]:
     print(f"✓ {b.batch_code}  {label} — En canasta")
 
 # ══════════════════════════════════════════════════════════════════
 print("""
 === Seed completo ===
 
-USUARIOS
+USUARIOS (pruebas piloto)
   supervisor / admin1234   → Supervisor (admin Django)
-  juan       / op1234      → Operario  (Bewo 1, Bewo 2, Socco 1)
-  maria      / op1234      → Operario  (Chaflaneadora, Moleteadora)
-  pedro      / op1234      → Operario  (Bewo 1, Bewo 2, Socco 2)
-  camila     / op1234      → Operario  (Socco 1, Socco 2)
+  operario1  / op1234      → Operario 1  (Bewo 1, Bewo 2, Socco 1)
+  operario2  / op1234      → Operario 2  (Chaflaneadora, Moleteadora)
+  operario3  / op1234      → Operario 3  (Bewo 1, Bewo 2, Socco 2)
+  operario4  / op1234      → Operario 4  (Socco 1, Socco 2)
+
+CATÁLOGO
+  8 TubeSpecs (extraídos del programa real: 5/8, 3/4, 1/2, 22.2,
+                25.4, 15.88, 20x40 rect., 6.35 barra)
+  16 ProductTypes con item_codes reales (277234, 877135, 358393, etc.)
+  Clientes: MotoPartes, Infantiles ABBA, Rejillas Plásticos, etc.
 
 LOTES (18 total, todos consistentes con ProcessShiftEntry)
   Terminados (4):  LOTE-0001, LOTE-0004, LOTE-0005, LOTE-0006
   Despachados (2): LOTE-0002, LOTE-0003
   Pausados (2):    LOTE-0008 (corte 80/150),  LOTE-0009 (moleteo 250/450)
   Activos (4):     LOTE-0007 (chaflan 200/600), LOTE-0010 (corte 120/500),
-                   LOTE-0011 (curvado 80/250),  LOTE-0012 (chaflan 100/350)
+                   LOTE-0011 (moleteo 80/250),  LOTE-0012 (chaflan 100/350)
   En canasta (6):  LOTE-0013 al LOTE-0018
 
 CALIDAD

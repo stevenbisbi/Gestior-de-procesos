@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='producttype',
             name='item_code',
-            field=models.CharField(blank=True, max_length=50, verbose_name='Item / SKU'),
+            field=models.CharField(blank=True, max_length=50, verbose_name='Item'),
         ),
         migrations.AlterField(
             model_name='cuttingprogramline',

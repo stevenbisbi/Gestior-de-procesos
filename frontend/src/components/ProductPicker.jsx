@@ -11,7 +11,7 @@ import { Alert } from './Common';
      onChange(id, productData) → callback cuando se selecciona/crea
    ══════════════════════════════════════════════════════════════════════════ */
 
-export default function ProductPicker({ value, onChange }) {
+export default function ProductPicker({ value, onChange, allowCreate = true }) {
   const [products, setProducts] = useState([]);
   const [tubes, setTubes]       = useState([]);
   const [query, setQuery]       = useState('');
@@ -62,16 +62,16 @@ export default function ProductPicker({ value, onChange }) {
     <div className="relative" ref={wrapperRef}>
       {/* Selección actual */}
       {selected ? (
-        <div className="border border-slate-300 rounded-lg px-3 py-2 bg-white flex items-start justify-between gap-2">
+        <div className="border-2 border-blue-300 rounded-lg px-3 py-2 bg-blue-50/40 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-sm text-slate-800 truncate">{selected.name}</span>
-              {selected.item_code && (
-                <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                  {selected.item_code}
-                </span>
-              )}
-            </div>
+            {selected.item_code ? (
+              <div className="font-mono text-base font-bold text-blue-700 leading-tight">
+                {selected.item_code}
+              </div>
+            ) : (
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Sin item</div>
+            )}
+            <div className="text-sm font-medium text-slate-800 truncate mt-0.5">{selected.name}</div>
             <div className="text-xs text-slate-500 truncate">
               {selected.tube_spec_data?.label} · corte {selected.cut_length} mm
               {selected.client && ` · ${selected.client}`}
@@ -92,7 +92,7 @@ export default function ProductPicker({ value, onChange }) {
             value={query}
             onChange={e => { setQuery(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            placeholder={loading ? 'Cargando productos…' : 'Buscar por nombre, item, tubo, cliente…'}
+            placeholder={loading ? 'Cargando productos…' : 'Buscar por item, nombre, tubo o cliente…'}
             disabled={loading}
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
           />
@@ -106,19 +106,23 @@ export default function ProductPicker({ value, onChange }) {
                     key={p.id}
                     type="button"
                     onClick={() => onPick(p)}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-50 transition border-b border-slate-50 last:border-b-0"
+                    className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition border-b border-slate-50 last:border-b-0 flex items-baseline gap-3"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-slate-800">{p.name}</span>
-                      {p.item_code && (
-                        <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                          {p.item_code}
-                        </span>
+                    {/* Item code GRANDE — primero (referencia principal de la empresa) */}
+                    <div className="flex-shrink-0 w-20">
+                      {p.item_code ? (
+                        <span className="font-mono text-base font-bold text-blue-700">{p.item_code}</span>
+                      ) : (
+                        <span className="text-[10px] uppercase text-slate-300">sin item</span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-500">
-                      {p.tube_spec_data?.label} · corte {p.cut_length} mm
-                      {p.client && <span className="text-blue-500"> · {p.client}</span>}
+                    {/* Nombre + detalles a la derecha, menor jerarquía */}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-slate-700 truncate">{p.name}</div>
+                      <div className="text-xs text-slate-400 truncate">
+                        {p.tube_spec_data?.label} · {p.cut_length} mm
+                        {p.client && <span className="text-blue-500"> · {p.client}</span>}
+                      </div>
                     </div>
                   </button>
                 ))
@@ -128,15 +132,21 @@ export default function ProductPicker({ value, onChange }) {
                 </div>
               )}
 
-              {/* Crear nuevo */}
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); setShowCreate(true); setOpen(false); }}
-                className="w-full text-left px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium border-t border-blue-200 sticky bottom-0"
-              >
-                ➕ Crear producto nuevo
-                {query && <span className="text-xs font-normal"> con nombre "{query}"</span>}
-              </button>
+              {/* Crear nuevo — solo si allowCreate */}
+              {allowCreate ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setShowCreate(true); setOpen(false); }}
+                  className="w-full text-left px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium border-t border-blue-200 sticky bottom-0"
+                >
+                  ➕ Crear producto nuevo
+                  {query && <span className="text-xs font-normal"> con nombre "{query}"</span>}
+                </button>
+              ) : (
+                <div className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-100 bg-slate-50 sticky bottom-0">
+                  ¿No aparece? Créalo desde la pestaña <strong>Lotes</strong> → "+ Producto"
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -172,8 +182,9 @@ const Field = ({ label, children, hint }) => (
 
 /* ════════════════════════════════════════════════════════════════════════════
    Modal — crea TubeSpec (opcional) + ProductType
+   Export nombrado para reutilizarlo desde la pestaña "Lotes".
    ══════════════════════════════════════════════════════════════════════════ */
-function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, onCreated }) {
+export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, onCreated }) {
   // — TubeSpec —
   const [tubeMode, setTubeMode] = useState('existing'); // 'existing' | 'new'
   const [tubeId,   setTubeId]   = useState('');
@@ -331,7 +342,7 @@ function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, 
                     onChange={e => setProd(s => ({...s, name: e.target.value}))}
                     placeholder="Manubrio 838"/>
                 </Field>
-                <Field label="Item / SKU" hint="Código interno (ej. 877135)">
+                <Field label="Item">
                   <input className={inpCls}
                     value={prod.item_code}
                     onChange={e => setProd(s => ({...s, item_code: e.target.value}))}/>

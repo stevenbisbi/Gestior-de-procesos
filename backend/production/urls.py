@@ -10,6 +10,7 @@ router.register(r'batches',           views.ProductionBatchViewSet)
 router.register(r'records',           views.ProcessRecordViewSet)
 router.register(r'cutting-programs',  views.CuttingProgramViewSet)
 router.register(r'cutting-lines',     views.CuttingProgramLineViewSet)
+router.register(r'tube-receptions',   views.TubeReceptionViewSet)
 
 urlpatterns = [
     path('health/',      views.health_check),  # público, para healthchecks

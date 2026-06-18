@@ -9,12 +9,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
 
-from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine
+from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception
 from .serializers import (TubeSpecSerializer, ProductTypeSerializer, MachineSerializer,
                           ProductionBatchSerializer, BatchListSerializer,
                           ProcessRecordSerializer, UserMiniSerializer,
                           CuttingProgramSerializer, CuttingProgramListSerializer,
-                          CuttingProgramLineSerializer)
+                          CuttingProgramLineSerializer, TubeReceptionSerializer)
 
 
 # ─── Health check (público — usado por Render) ──────────
@@ -113,6 +113,35 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
         batch = serializer.save(created_by=self.request.user)
         batch.create_process_records()
 
+    def perform_update(self, serializer):
+        old_qty = serializer.instance.total_quantity
+        batch = serializer.save()
+        # Si el supervisor corrigió la cantidad, propagar a los procesos
+        if batch.total_quantity != old_qty:
+            batch.sync_records_qty()
+
+    @action(detail=True, methods=['post'], url_path='receive')
+    def receive_material(self, request, pk=None):
+        """Cortador confirma recepción del material. Lote pasa de waiting_material → in_basket."""
+        batch = self.get_object()
+        if batch.status != 'waiting_material':
+            return Response({'detail': 'Este lote no está esperando material.'}, status=400)
+        tube_spec = None
+        ts_id = request.data.get('tube_spec') or batch.product_type.tube_spec_id
+        if ts_id:
+            tube_spec = TubeSpec.objects.filter(pk=ts_id).first()
+        try:
+            batch.receive_material(
+                user=request.user,
+                tube_spec=tube_spec,
+                quantity=int(request.data.get('quantity') or 0) or None,
+                delivered_by=request.data.get('delivered_by', ''),
+                notes=request.data.get('notes', ''),
+            )
+        except Exception as e:
+            return Response({'detail': str(e)}, status=400)
+        return Response(ProductionBatchSerializer(batch).data)
+
     @action(detail=True, methods=['post'], url_path='dispatch')
     def dispatch_batch(self, request, pk=None):
         batch = self.get_object()
@@ -163,6 +192,7 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'No hay turno activo en este proceso.'}, status=400)
 
         qty = int(request.data.get('qty_done', 0))
+        finalize = request.data.get('finalize') in (True, 'true', '1', 1)
         remaining = record.qty_remaining
         if qty < 1 or qty > remaining:
             return Response(
@@ -175,6 +205,7 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 user=request.user,
                 signature=request.data.get('signature', ''),
                 notes=request.data.get('notes', ''),
+                finalize=finalize,
             )
         except Exception as e:
             return Response({'detail': str(e)}, status=400)
@@ -242,6 +273,51 @@ class CuttingProgramLineViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
+# ─── Canasta de tubería (recepciones) ───────────────────
+
+class TubeReceptionViewSet(viewsets.ModelViewSet):
+    """
+    El cortador registra cada llegada de tubería desde almacén.
+    GET  /tube-receptions/         lista (filtros: ?tube_spec=ID)
+    POST /tube-receptions/         crear recepción
+    GET  /tube-receptions/basket/  vista de canasta — totales por TubeSpec
+    """
+    queryset = TubeReception.objects.select_related('tube_spec', 'received_by').all()
+    serializer_class = TubeReceptionSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        tube_spec = self.request.query_params.get('tube_spec')
+        if tube_spec:
+            qs = qs.filter(tube_spec_id=tube_spec)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(received_by=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def basket(self, request):
+        """Devuelve total de tubos disponibles por especificación."""
+        from django.db.models import Sum, Max
+        rows = (TubeReception.objects
+                .values('tube_spec')
+                .annotate(total=Sum('quantity'), last_at=Max('received_at'))
+                .order_by('-last_at'))
+        tube_ids   = [r['tube_spec'] for r in rows]
+        tube_specs = TubeSpec.objects.in_bulk(tube_ids)
+        out = []
+        for r in rows:
+            ts = tube_specs.get(r['tube_spec'])
+            if not ts:
+                continue
+            out.append({
+                'tube_spec':      TubeSpecSerializer(ts).data,
+                'total':          r['total'],
+                'last_received':  r['last_at'],
+            })
+        return Response(out)
+
+
 # ─── Dashboards ─────────────────────────────────────────
 
 @api_view(['GET'])
@@ -257,10 +333,11 @@ def supervisor_dashboard(request):
         }
     return Response({
         'process_stats': process_stats,
-        'in_basket':  active.filter(status='in_basket').count(),
-        'in_process': active.filter(status='in_process').count(),
-        'finished':   active.filter(status='finished').count(),
-        'total':      active.count(),
+        'waiting_material': active.filter(status='waiting_material').count(),
+        'in_basket':        active.filter(status='in_basket').count(),
+        'in_process':       active.filter(status='in_process').count(),
+        'finished':         active.filter(status='finished').count(),
+        'total':            active.count(),
     })
 
 

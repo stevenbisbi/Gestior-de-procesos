@@ -107,8 +107,10 @@ function LineForm({ program, onSave, onCancel, initial }) {
       <Section title="Producto y cliente">
         <div className="col-span-2 sm:col-span-4 flex flex-col gap-1">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Producto</span>
-          <ProductPicker value={form.product_type} onChange={handleProductChange}/>
-          <span className="text-[10px] text-slate-400">Busca en el histórico o crea uno nuevo si no existe.</span>
+          <ProductPicker value={form.product_type} onChange={handleProductChange} allowCreate={false}/>
+          <span className="text-[10px] text-slate-400">
+            Busca por item. ¿Es un producto nuevo? Créalo desde la pestaña <strong>Lotes</strong> → "+ Producto".
+          </span>
         </div>
         <Field label="Item (código)"><input className={inpCls} value={form.item_code} onChange={e=>set('item_code',e.target.value)}/></Field>
         <Field label="Cliente"><input className={inpCls} required value={form.client} onChange={e=>set('client',e.target.value)}/></Field>
