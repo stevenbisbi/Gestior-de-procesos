@@ -58,7 +58,12 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* Stats summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="stat-card">
+          <div className="stat-num text-amber-600">{stats.waiting_material || 0}</div>
+          <div className="stat-label">Esperando material</div>
+          <div className="stat-sub">Sin recibir aún</div>
+        </div>
         <div className="stat-card">
           <div className="stat-num text-blue-600">{stats.in_basket}</div>
           <div className="stat-label">En canasta</div>
@@ -130,10 +135,11 @@ export default function SupervisorDashboard() {
 function BatchRow({ b }) {
   const cp = b.current_process;
   const statusBadgeCls = {
-    in_basket:  'badge-blue',
-    in_process: 'badge-amber',
-    finished:   'badge-green',
-    dispatched: 'badge-gray',
+    waiting_material: 'badge-amber',
+    in_basket:        'badge-blue',
+    in_process:       'badge-amber',
+    finished:         'badge-green',
+    dispatched:       'badge-gray',
   }[b.status] || 'badge-gray';
 
   const procStatusBadge = cp && {

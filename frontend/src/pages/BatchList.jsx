@@ -7,10 +7,11 @@ import { BatchCard, Loading, Alert } from '../components/Common';
 import ProductPicker, { CreateProductModal } from '../components/ProductPicker';
 
 const STATUSES = [
-  { v: '',           label: 'Todos' },
-  { v: 'in_basket',  label: 'En canasta' },
-  { v: 'in_process', label: 'En proceso' },
-  { v: 'finished',   label: 'Terminados' },
+  { v: '',                 label: 'Todos' },
+  { v: 'waiting_material', label: 'Esperando material' },
+  { v: 'in_basket',        label: 'En canasta' },
+  { v: 'in_process',       label: 'En proceso' },
+  { v: 'finished',         label: 'Terminados' },
 ];
 
 export default function BatchList() {
@@ -109,6 +110,7 @@ function NewBatchModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     product_type: '', total_quantity: '', priority: 'media',
     scheduled_date: '', notes: '',
+    material_received: false,  // si está marcado, va directo a in_basket
   });
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -134,6 +136,10 @@ function NewBatchModal({ onClose, onCreated }) {
         scheduled_date: form.scheduled_date || null,
         notes:          form.notes,
       });
+      // Si el supervisor marca que el material ya está, lo recibimos auto
+      if (form.material_received) {
+        try { await Batches.receive(created.id, {}); } catch {}
+      }
       onCreated();
       nav(`/lote/${created.id}`);
     } catch (ex) {
@@ -203,9 +209,17 @@ function NewBatchModal({ onClose, onCreated }) {
                 onChange={e => set('notes', e.target.value)} />
             </div>
 
-            <div className="text-[11px] text-slate-400 bg-blue-50 border border-blue-100 rounded px-3 py-2">
-              💡 El lote se crea en estado <strong>"En canasta"</strong>. Después podés agregarlo al programa de corte si pasa por las Bewo.
-            </div>
+            <label className="flex items-start gap-2 cursor-pointer select-none bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+              <input type="checkbox" checked={form.material_received}
+                onChange={e => set('material_received', e.target.checked)}
+                className="mt-0.5"/>
+              <span className="text-xs text-slate-700">
+                <strong>Material ya disponible</strong> — poner directo en canasta
+                <span className="block text-[10px] text-slate-500">
+                  Si se deja sin marcar, el lote queda <strong>"Esperando material"</strong> hasta que un cortador lo reciba desde Canasta.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-2xl">

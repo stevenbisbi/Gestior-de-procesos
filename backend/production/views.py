@@ -120,6 +120,28 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
         if batch.total_quantity != old_qty:
             batch.sync_records_qty()
 
+    @action(detail=True, methods=['post'], url_path='receive')
+    def receive_material(self, request, pk=None):
+        """Cortador confirma recepción del material. Lote pasa de waiting_material → in_basket."""
+        batch = self.get_object()
+        if batch.status != 'waiting_material':
+            return Response({'detail': 'Este lote no está esperando material.'}, status=400)
+        tube_spec = None
+        ts_id = request.data.get('tube_spec') or batch.product_type.tube_spec_id
+        if ts_id:
+            tube_spec = TubeSpec.objects.filter(pk=ts_id).first()
+        try:
+            batch.receive_material(
+                user=request.user,
+                tube_spec=tube_spec,
+                quantity=int(request.data.get('quantity') or 0) or None,
+                delivered_by=request.data.get('delivered_by', ''),
+                notes=request.data.get('notes', ''),
+            )
+        except Exception as e:
+            return Response({'detail': str(e)}, status=400)
+        return Response(ProductionBatchSerializer(batch).data)
+
     @action(detail=True, methods=['post'], url_path='dispatch')
     def dispatch_batch(self, request, pk=None):
         batch = self.get_object()
@@ -311,10 +333,11 @@ def supervisor_dashboard(request):
         }
     return Response({
         'process_stats': process_stats,
-        'in_basket':  active.filter(status='in_basket').count(),
-        'in_process': active.filter(status='in_process').count(),
-        'finished':   active.filter(status='finished').count(),
-        'total':      active.count(),
+        'waiting_material': active.filter(status='waiting_material').count(),
+        'in_basket':        active.filter(status='in_basket').count(),
+        'in_process':       active.filter(status='in_process').count(),
+        'finished':         active.filter(status='finished').count(),
+        'total':            active.count(),
     })
 
 

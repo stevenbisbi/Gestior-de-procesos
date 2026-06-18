@@ -75,8 +75,11 @@ PROCESS_LABELS = {'corte':'Corte','chaflan':'Chaflanado','moleteo':'Moleteado','
 
 class ProductionBatch(models.Model):
     STATUS_CHOICES = [
-        ('in_basket','En canasta'),('in_process','En proceso'),
-        ('finished','Terminado'),('dispatched','Despachado'),
+        ('waiting_material', 'Esperando material'),  # creado, pero almacén no entregó tubería todavía
+        ('in_basket',  'En canasta'),                 # material recibido por el cortador, listo para cortar
+        ('in_process', 'En proceso'),
+        ('finished',   'Terminado'),
+        ('dispatched', 'Despachado'),
     ]
     PRIORITY_CHOICES = [('alta','Alta'),('media','Media'),('baja','Baja')]
 
@@ -85,7 +88,7 @@ class ProductionBatch(models.Model):
     total_quantity  = models.IntegerField()
     priority        = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='media')
     scheduled_date  = models.DateField(null=True, blank=True)
-    status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in_basket')
+    status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default='waiting_material')
     notes           = models.TextField(blank=True)
     created_by      = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='batches_created')
     created_at      = models.DateTimeField(auto_now_add=True)
@@ -143,8 +146,8 @@ class ProductionBatch(models.Model):
         self._recalc_status()
 
     def _recalc_status(self):
-        """Recalcula el estado del lote a partir de sus procesos (no toca dispatched)."""
-        if self.status == 'dispatched':
+        """Recalcula el estado del lote a partir de sus procesos (no toca dispatched ni waiting_material)."""
+        if self.status in ('dispatched', 'waiting_material'):
             return
         if not self.records.exists():
             return
@@ -155,6 +158,24 @@ class ProductionBatch(models.Model):
         else:
             self.status = 'in_basket'
         self.save(update_fields=['status', 'updated_at'])
+
+    def receive_material(self, user, tube_spec=None, quantity=None, delivered_by='', notes=''):
+        """
+        El cortador confirma recepción del material → lote pasa de
+        'waiting_material' a 'in_basket' (listo para cortar).
+        Opcionalmente registra el TubeReception para inventario / auditoría.
+        """
+        from django.core.exceptions import ValidationError
+        if self.status != 'waiting_material':
+            raise ValidationError('Este lote no está esperando material.')
+        self.status = 'in_basket'
+        self.save(update_fields=['status', 'updated_at'])
+        if tube_spec and quantity:
+            TubeReception.objects.create(
+                tube_spec=tube_spec, quantity=quantity,
+                delivered_by=delivered_by or '', notes=notes or '',
+                received_by=user, batch=self,
+            )
 
     @property
     def progress_pct(self):
@@ -174,9 +195,10 @@ class ProductionBatch(models.Model):
 
 class TubeReception(models.Model):
     """
-    Cada vez que un cortador recibe tubería cruda desde almacén, registra
-    cuántos tubos llegaron, qué especificación, quién los entregó y notas.
-    La suma por TubeSpec forma la 'canasta' disponible para cortar.
+    Registro de recepción de tubería cruda desde almacén.
+    - tube_spec: qué tipo de tubo llegó
+    - quantity: cuántos
+    - batch (opcional): si la recepción fue contra un lote específico, queda enlazado
     """
     tube_spec    = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='receptions')
     quantity     = models.IntegerField(verbose_name='Cantidad de tubos recibidos')
@@ -184,6 +206,10 @@ class TubeReception(models.Model):
     notes        = models.TextField(blank=True)
     received_by  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='tube_receptions')
     received_at  = models.DateTimeField(auto_now_add=True)
+    batch        = models.ForeignKey(
+        'ProductionBatch', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='material_receptions',
+    )
 
     class Meta:
         ordering = ['-received_at']

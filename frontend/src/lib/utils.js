@@ -7,12 +7,13 @@ export const PROCESS_ICONS = {
 };
 
 export const STATUS_BADGES = {
-  in_basket:  { cls: 'badge-blue badge-dot',  label: 'En canasta' },
-  in_process: { cls: 'badge-amber badge-dot', label: 'En proceso' },
-  paused:     { cls: 'badge-blue badge-dot',  label: 'Pausado' },
-  finished:   { cls: 'badge-green badge-dot', label: 'Terminado' },
-  dispatched: { cls: 'badge-gray badge-dot',  label: 'Despachado' },
-  pending:    { cls: 'badge-gray',  label: 'Pendiente' },
+  waiting_material: { cls: 'badge-amber badge-dot', label: 'Esperando material' },
+  in_basket:        { cls: 'badge-blue badge-dot',  label: 'En canasta' },
+  in_process:       { cls: 'badge-amber badge-dot', label: 'En proceso' },
+  paused:           { cls: 'badge-blue badge-dot',  label: 'Pausado' },
+  finished:         { cls: 'badge-green badge-dot', label: 'Terminado' },
+  dispatched:       { cls: 'badge-gray badge-dot',  label: 'Despachado' },
+  pending:          { cls: 'badge-gray',            label: 'Pendiente' },
 };
 
 export function formatDate(d) {

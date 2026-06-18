@@ -1,26 +1,31 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { TubeReceptions, Catalog } from '../lib/api';
+import { Link } from 'react-router-dom';
+import { Batches, TubeReceptions } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { Loading, Alert } from '../components/Common';
-import { formatDateTime } from '../lib/utils';
+import { Loading, Alert, PriorityTag } from '../components/Common';
+import { formatDateTime, formatDate } from '../lib/utils';
 
 export default function Canasta() {
   const { user }                  = useAuth();
-  const [basket, setBasket]       = useState([]);
+  const [waiting, setWaiting]     = useState([]);
+  const [inBasket, setInBasket]   = useState([]);
   const [history, setHistory]     = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [showReceive, setShowReceive] = useState(false);
   const [err, setErr]             = useState('');
+  const [receivingBatch, setReceivingBatch] = useState(null);
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const [b, h] = await Promise.all([
-        TubeReceptions.basket(),
+      // Lotes que esperan material y los que ya están listos para cortar
+      const [w, b, h] = await Promise.all([
+        Batches.list({ status: 'waiting_material' }),
+        Batches.list({ status: 'in_basket' }),
         TubeReceptions.list({}),
       ]);
-      setBasket(b);
+      setWaiting(w);
+      setInBasket(b);
       setHistory(h);
     } catch (e) { setErr(e.message); }
     finally     { setLoading(false); }
@@ -30,78 +35,59 @@ export default function Canasta() {
 
   if (loading) return <Loading />;
 
-  const totalTubes = basket.reduce((s, b) => s + (b.total || 0), 0);
-
   return (
     <div className="space-y-5">
       {/* Cabecera */}
       <div className="bg-navy text-white rounded-2xl px-5 py-4 flex items-start justify-between flex-wrap gap-3">
         <div>
-          <p className="text-xs text-white/60 font-medium uppercase tracking-wide">Inventario · Materia prima</p>
-          <h1 className="text-2xl font-bold mt-0.5">🧺 Canasta de tubería</h1>
+          <p className="text-xs text-white/60 font-medium uppercase tracking-wide">Recepción · Material para cortar</p>
+          <h1 className="text-2xl font-bold mt-0.5">🧺 Canasta</h1>
           <p className="text-sm text-white/60 mt-0.5">
-            {basket.length} referencias · <strong className="text-white">{totalTubes.toLocaleString()}</strong> tubos disponibles
+            <strong className="text-amber-300">{waiting.length}</strong> esperando material ·{' '}
+            <strong className="text-green-300">{inBasket.length}</strong> listos para cortar
           </p>
         </div>
-        <button onClick={() => setShowReceive(true)}
-          className="btn btn-success px-5 py-2.5">
-          📥 Recibir tubería
-        </button>
       </div>
 
       {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
 
-      {/* Grid de canasta por TubeSpec */}
-      {basket.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm text-center py-16 text-slate-400">
-          <div className="text-5xl mb-3">🧺</div>
-          <p className="text-lg font-medium">La canasta está vacía</p>
-          <p className="text-sm mt-1">Cuando recibas tubería del almacén, regístrala con el botón de arriba.</p>
-        </div>
-      ) : (
-        <div>
-          <SectionTitle>Disponible en canasta</SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {basket.map(item => (
-              <div key={item.tube_spec.id}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-                <div className="flex items-baseline justify-between gap-2 mb-2">
-                  <span className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
-                    {item.tube_spec.shape_display}
-                  </span>
-                  <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-medium">
-                    {item.tube_spec.material_display}
-                  </span>
-                </div>
-                <div className="font-mono text-lg font-bold text-slate-800">
-                  Ø {item.tube_spec.outer_diameter}
-                  <span className="text-slate-400 text-sm font-normal"> × {item.tube_spec.thickness} mm</span>
-                </div>
-                <div className="text-xs text-slate-500 mb-3">
-                  Largo: {item.tube_spec.original_length?.toFixed?.(0) || item.tube_spec.original_length} mm
-                </div>
-                <div className="border-t border-slate-100 pt-3 flex items-end justify-between">
-                  <div>
-                    <div className="text-[10px] uppercase text-slate-400 font-semibold">Tubos disponibles</div>
-                    <div className="font-mono text-2xl font-bold text-green-600 leading-none mt-0.5">
-                      {item.total.toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase text-slate-400 font-semibold">Última recepción</div>
-                    <div className="text-xs text-slate-500">{formatDateTime(item.last_received)}</div>
-                  </div>
-                </div>
-              </div>
+      {/* Esperando material */}
+      <section>
+        <SectionTitle accent="amber">
+          ⏳ Esperando material <span className="text-slate-500 font-normal">({waiting.length})</span>
+        </SectionTitle>
+        {waiting.length === 0 ? (
+          <EmptyMsg text="No hay lotes esperando material."/>
+        ) : (
+          <div className="space-y-2">
+            {waiting.map(b => (
+              <BatchRow key={b.id} batch={b} mode="waiting"
+                onReceive={() => setReceivingBatch(b)} />
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </section>
 
-      {/* Historial de recepciones */}
+      {/* En canasta — listos para cortar */}
+      <section>
+        <SectionTitle accent="green">
+          🧺 En canasta — listos para cortar <span className="text-slate-500 font-normal">({inBasket.length})</span>
+        </SectionTitle>
+        {inBasket.length === 0 ? (
+          <EmptyMsg text="Aún no hay lotes con material recibido."/>
+        ) : (
+          <div className="space-y-2">
+            {inBasket.map(b => (
+              <BatchRow key={b.id} batch={b} mode="ready"/>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Historial */}
       {history.length > 0 && (
-        <div>
-          <SectionTitle>Historial reciente</SectionTitle>
+        <section>
+          <SectionTitle>📋 Recepciones recientes</SectionTitle>
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -109,86 +95,128 @@ export default function Canasta() {
                   <tr>
                     <th className="text-left py-2.5 px-3 whitespace-nowrap">Fecha</th>
                     <th className="text-left py-2.5 px-3">Tubería</th>
-                    <th className="text-center py-2.5 px-3 whitespace-nowrap">Cantidad</th>
-                    <th className="text-left py-2.5 px-3 whitespace-nowrap">Entregó (almacén)</th>
-                    <th className="text-left py-2.5 px-3 whitespace-nowrap">Recibió</th>
-                    <th className="text-left py-2.5 px-3">Notas</th>
+                    <th className="text-center py-2.5 px-3">Cantidad</th>
+                    <th className="text-left py-2.5 px-3">Lote</th>
+                    <th className="text-left py-2.5 px-3">Almacén</th>
+                    <th className="text-left py-2.5 px-3">Recibió</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.slice(0, 50).map(r => (
+                  {history.slice(0, 30).map(r => (
                     <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
                       <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-nowrap">
                         {formatDateTime(r.received_at)}
                       </td>
                       <td className="py-2.5 px-3">
-                        <div className="text-sm font-medium text-slate-700">
+                        <div className="text-xs font-medium text-slate-700">
                           Ø {r.tube_spec_data?.outer_diameter} × {r.tube_spec_data?.thickness}
                         </div>
-                        <div className="text-xs text-slate-400">{r.tube_spec_data?.material_display}</div>
+                        <div className="text-[10px] text-slate-400">{r.tube_spec_data?.material_display}</div>
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono font-bold text-green-600">
                         +{r.quantity}
                       </td>
+                      <td className="py-2.5 px-3 text-xs">
+                        {r.batch ? (
+                          <Link to={`/lote/${r.batch}`} className="font-mono text-blue-600 hover:underline">
+                            #{r.batch}
+                          </Link>
+                        ) : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="py-2.5 px-3 text-xs text-slate-600">{r.delivered_by || '—'}</td>
                       <td className="py-2.5 px-3 text-xs text-slate-600">{r.received_by_data?.full_name || '—'}</td>
-                      <td className="py-2.5 px-3 text-xs text-slate-500">{r.notes || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {history.length > 50 && (
-              <div className="text-center text-xs text-slate-400 py-2 border-t border-slate-100">
-                Mostrando 50 más recientes de {history.length}
-              </div>
-            )}
           </div>
-        </div>
+        </section>
       )}
 
-      {showReceive && (
-        <ReceiveTubeModal
+      {receivingBatch && (
+        <ReceiveModal
+          batch={receivingBatch}
           user={user}
-          onClose={() => setShowReceive(false)}
-          onCreated={() => { setShowReceive(false); refresh(); }}
+          onClose={() => setReceivingBatch(null)}
+          onReceived={() => { setReceivingBatch(null); refresh(); }}
         />
       )}
     </div>
   );
 }
 
-// ── Modal "Recibir tubería" ──────────────────────────────────────────────────
-function ReceiveTubeModal({ user, onClose, onCreated }) {
-  const [tubes, setTubes] = useState([]);
-  const [loadingTubes, setLoadingTubes] = useState(true);
+// ── Fila de lote (waiting o ready) ──────────────────────────────────────────
+function BatchRow({ batch, mode, onReceive }) {
+  const tube = batch.tube_label || batch.product_type_data?.tube_spec_data?.label;
+  const productName = batch.product_name || batch.product_type_data?.name;
+  const cutLength   = batch.cut_length   || batch.product_type_data?.cut_length;
+  const isWaiting   = mode === 'waiting';
+
+  return (
+    <div className={`bg-white rounded-xl border-l-4 border border-slate-100 shadow-sm p-3.5 flex items-center gap-3
+      ${isWaiting ? 'border-l-amber-500' : 'border-l-green-500'}`}>
+      <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-2xl flex-shrink-0">
+        {isWaiting ? '⏳' : '🧺'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link to={`/lote/${batch.id}`}
+            className="font-mono text-sm font-semibold text-blue-600 hover:underline">
+            {batch.batch_code}
+          </Link>
+          <PriorityTag priority={batch.priority} />
+        </div>
+        <div className="font-semibold text-slate-800 truncate">{productName}</div>
+        <div className="text-xs text-slate-500 truncate">
+          {tube} · corte <strong>{cutLength?.toFixed?.(0) ?? cutLength}</strong> mm
+          {' · '}
+          <strong>{batch.total_quantity?.toLocaleString()}</strong> uds
+        </div>
+        {batch.scheduled_date && (
+          <div className="text-[11px] text-slate-400 mt-0.5">📅 Programado: {formatDate(batch.scheduled_date)}</div>
+        )}
+      </div>
+      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+        {isWaiting ? (
+          <button onClick={onReceive} className="btn btn-success btn-sm whitespace-nowrap">
+            📥 Recibir material
+          </button>
+        ) : (
+          <Link to={`/lote/${batch.id}`} className="btn btn-outline btn-sm">Ver lote</Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Modal de recepción para un lote ─────────────────────────────────────────
+function ReceiveModal({ batch, user, onClose, onReceived }) {
+  const tubeSpec = batch.product_type_data?.tube_spec_data;
   const [form, setForm] = useState({
-    tube_spec: '', quantity: '', delivered_by: '', notes: '',
+    quantity: batch.total_quantity || '',
+    delivered_by: '',
+    notes: '',
+    log_reception: true,  // registrar tube reception
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
-
-  useEffect(() => {
-    Catalog.tubes().then(setTubes).finally(() => setLoadingTubes(false));
-  }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.tube_spec || !form.quantity) {
-      setErr('Selecciona el tubo e ingresa la cantidad.');
-      return;
-    }
     setSaving(true); setErr('');
     try {
-      await TubeReceptions.create({
-        tube_spec:    Number(form.tube_spec),
-        quantity:     Number(form.quantity),
-        delivered_by: form.delivered_by,
-        notes:        form.notes,
-      });
-      onCreated();
+      const payload = form.log_reception
+        ? {
+            quantity: Number(form.quantity) || null,
+            delivered_by: form.delivered_by,
+            notes: form.notes,
+          }
+        : {};  // sin tubería específica, solo marcar como recibido
+      await Batches.receive(batch.id, payload);
+      onReceived();
     } catch (ex) {
       setErr(ex.message);
     } finally {
@@ -202,8 +230,12 @@ function ReceiveTubeModal({ user, onClose, onCreated }) {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-8">
         <form onSubmit={submit}>
-          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-800">📥 Recibir tubería</h2>
+          <div className="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-2">
+            <div>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">Recibir material</p>
+              <h2 className="text-lg font-bold text-slate-800">{batch.batch_code}</h2>
+              <p className="text-xs text-slate-500">{batch.product_name || batch.product_type_data?.name}</p>
+            </div>
             <button type="button" onClick={onClose}
               className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
           </div>
@@ -211,66 +243,64 @@ function ReceiveTubeModal({ user, onClose, onCreated }) {
           <div className="px-5 py-4 space-y-4">
             {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
 
-            <div className="bg-slate-50 rounded-lg px-3 py-2 text-xs text-slate-600">
-              👤 Recibido por: <strong className="text-slate-800">{user.full_name}</strong>
-              <span className="text-slate-400 ml-2">(automático)</span>
+            <div className="bg-slate-50 rounded-lg px-3 py-2 text-xs text-slate-600 space-y-0.5">
+              <div>👤 Recibido por: <strong className="text-slate-800">{user.full_name}</strong> <span className="text-slate-400">(automático)</span></div>
+              {tubeSpec && (
+                <div>📐 Tubo esperado: <strong className="text-slate-800">{tubeSpec.label}</strong></div>
+              )}
             </div>
 
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
-                Tubo recibido
-              </span>
-              <select required className={`${inp} bg-white`}
-                disabled={loadingTubes}
-                value={form.tube_spec}
-                onChange={e => set('tube_spec', e.target.value)}>
-                <option value="">{loadingTubes ? 'Cargando…' : '— seleccionar tubo —'}</option>
-                {tubes.map(t => (
-                  <option key={t.id} value={t.id}>
-                    Ø {t.outer_diameter} × {t.thickness} mm · {t.material_display} · {t.original_length?.toFixed?.(0) || t.original_length} mm largo
-                  </option>
-                ))}
-              </select>
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                ¿No aparece? Pídele al supervisor que lo cree desde Lotes → "+ Producto".
+            <label className="flex items-start gap-2 cursor-pointer select-none bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <input type="checkbox" checked={form.log_reception}
+                onChange={e => set('log_reception', e.target.checked)}
+                className="mt-0.5"/>
+              <span className="text-xs text-slate-700">
+                <strong>Registrar recepción de tubería</strong>
+                <span className="block text-[10px] text-slate-500">
+                  Recomendado: anota cuántos tubos llegaron y quién los entregó.
+                </span>
               </span>
             </label>
 
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
-                Cantidad de tubos recibidos
-              </span>
-              <input type="number" min="1" required className={inp}
-                value={form.quantity}
-                onChange={e => set('quantity', e.target.value)}
-                placeholder="ej. 150"/>
-            </label>
+            {form.log_reception && (
+              <>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                    Cantidad de tubos recibidos
+                  </span>
+                  <input type="number" min="1" required={form.log_reception} className={inp}
+                    value={form.quantity}
+                    onChange={e => set('quantity', e.target.value)}
+                    placeholder="ej. 150"/>
+                </label>
 
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
-                Entregado por (persona de almacén)
-              </span>
-              <input className={inp}
-                value={form.delivered_by}
-                onChange={e => set('delivered_by', e.target.value)}
-                placeholder="Nombre del personal de almacén"/>
-            </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                    Entregado por (persona de almacén)
+                  </span>
+                  <input className={inp}
+                    value={form.delivered_by}
+                    onChange={e => set('delivered_by', e.target.value)}
+                    placeholder="Nombre del personal"/>
+                </label>
 
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
-                Notas (opcional)
-              </span>
-              <textarea rows={2} className={`${inp} resize-none`}
-                value={form.notes}
-                onChange={e => set('notes', e.target.value)}
-                placeholder="Estado del material, observaciones, etc."/>
-            </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                    Notas
+                  </span>
+                  <textarea rows={2} className={`${inp} resize-none`}
+                    value={form.notes}
+                    onChange={e => set('notes', e.target.value)}
+                    placeholder="Estado del material, observaciones, etc."/>
+                </label>
+              </>
+            )}
           </div>
 
           <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-2xl">
             <button type="button" onClick={onClose} className="btn btn-outline px-4">Cancelar</button>
             <button type="submit" disabled={saving} className="btn btn-success px-5">
-              {saving ? 'Registrando…' : '✓ Agregar a la canasta'}
+              {saving ? 'Registrando…' : '✓ Confirmar recepción'}
             </button>
           </div>
         </form>
@@ -280,12 +310,21 @@ function ReceiveTubeModal({ user, onClose, onCreated }) {
   );
 }
 
-function SectionTitle({ children }) {
+function SectionTitle({ children, accent }) {
+  const accentCls = accent === 'amber' ? 'text-amber-700'
+                  : accent === 'green' ? 'text-green-700'
+                  : 'text-slate-400';
   return (
-    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-      <span className="h-px w-3 bg-slate-200" />
+    <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${accentCls}`}>
       {children}
-      <span className="h-px flex-1 bg-slate-200" />
+    </div>
+  );
+}
+
+function EmptyMsg({ text }) {
+  return (
+    <div className="bg-slate-50 border border-slate-100 rounded-xl py-6 text-center text-sm text-slate-400">
+      {text}
     </div>
   );
 }
