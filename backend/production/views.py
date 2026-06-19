@@ -353,12 +353,21 @@ def supervisor_dashboard(request):
             'finished':   ProcessRecord.objects.filter(process_type=pt, status='finished').count(),
             'pending':    ProcessRecord.objects.filter(process_type=pt, status='pending').count(),
         }
+    # Lotes con defectos pendientes (qty_defective > 0 en al menos un proceso)
+    batches_with_defects = active.filter(records__qty_defective__gt=0).distinct()
+    from django.db.models import Sum
+    defect_agg = ProcessRecord.objects.filter(
+        batch__in=active, qty_defective__gt=0,
+    ).aggregate(total=Sum('qty_defective'))
+
     return Response({
         'process_stats': process_stats,
         'waiting_material': active.filter(status='waiting_material').count(),
         'in_basket':        active.filter(status='in_basket').count(),
         'in_process':       active.filter(status='in_process').count(),
         'finished':         active.filter(status='finished').count(),
+        'with_defects':     batches_with_defects.count(),
+        'defective_qty':    defect_agg['total'] or 0,
         'total':            active.count(),
     })
 

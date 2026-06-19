@@ -58,7 +58,7 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* Stats summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="stat-card">
           <div className="stat-num text-amber-600">{stats.waiting_material || 0}</div>
           <div className="stat-label">Esperando material</div>
@@ -79,6 +79,11 @@ export default function SupervisorDashboard() {
           <div className="stat-label">Terminados</div>
           <div className="stat-sub">Listos para despacho</div>
         </div>
+        <Link to="/defectuosos" className="stat-card hover:bg-red-50/40 hover:border-red-200 transition cursor-pointer">
+          <div className="stat-num text-red-600">{stats.with_defects || 0}</div>
+          <div className="stat-label">Con defectos</div>
+          <div className="stat-sub">{(stats.defective_qty || 0).toLocaleString()} pzs en rework</div>
+        </Link>
         <div className="stat-card">
           <div className="stat-num">{stats.total}</div>
           <div className="stat-label">Total en planta</div>
