@@ -13,6 +13,7 @@ export default function ProcessFinish() {
 
   const [record, setRecord]       = useState(null);
   const [qtyDone, setQtyDone]     = useState('');
+  const [qtyDefective, setQtyDefective] = useState('');
   const [shift, setShift]         = useState('');
   const [notes, setNotes]         = useState('');
   const [signature, setSignature] = useState('');
@@ -61,8 +62,10 @@ export default function ProcessFinish() {
     e.preventDefault();
     setSaving(true); setError(null);
     try {
+      const numDef = Math.max(0, Math.min(numericQty, parseInt(qtyDefective) || 0));
       await Records.finish(id, {
-        qty_done:  numericQty,
+        qty_done:      numericQty,
+        qty_defective: numDef,
         signature, notes,
         finalize:  finalize || reachesTotal,
       });
@@ -160,6 +163,37 @@ export default function ProcessFinish() {
                   </span>
                 </span>
               </label>
+            )}
+          </div>
+        </div>
+
+        {/* Cantidad de piezas defectuosas */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">¿Cuántas salieron defectuosas?</span>
+            <span className="text-xs text-slate-400">De las {numericQty} producidas</span>
+          </div>
+          <div className="card-body">
+            <div className="flex items-center gap-3 border-2 border-slate-200 rounded-lg px-4 py-2 bg-red-50/40">
+              <button type="button"
+                onClick={() => setQtyDefective(String(Math.max(0, (parseInt(qtyDefective) || 0) - 1)))}
+                className="w-8 h-8 rounded-full border bg-white hover:border-red-400">−</button>
+              <input type="number" min="0" max={numericQty} value={qtyDefective}
+                onChange={e => setQtyDefective(e.target.value)}
+                placeholder="0"
+                className="flex-1 text-center text-2xl font-mono font-medium bg-transparent outline-none text-red-700" />
+              <button type="button"
+                onClick={() => setQtyDefective(String(Math.min(numericQty, (parseInt(qtyDefective) || 0) + 1)))}
+                className="w-8 h-8 rounded-full border bg-white hover:border-red-400">+</button>
+              <span className="text-sm text-slate-600">defectuosas</span>
+            </div>
+
+            {(parseInt(qtyDefective) || 0) > 0 && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-800">
+                🔧 Quedan <strong>{(parseInt(qtyDefective) || 0).toLocaleString()} piezas defectuosas</strong> en
+                el pool de rework. El siguiente proceso solo verá <strong>{(numericQty - (parseInt(qtyDefective) || 0)).toLocaleString()}</strong> disponibles
+                hasta que se reparen o descarten desde <em>Lotes → Defectuosos</em>.
+              </div>
             )}
           </div>
         </div>

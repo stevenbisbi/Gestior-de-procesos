@@ -123,7 +123,22 @@ class ProductionBatch(models.Model):
         if idx == 0:
             return self.status in ('in_basket', 'in_process')
         prev = self.records.filter(process_type=route[idx-1]).first()
+        # El proceso anterior debe estar terminado (todo lo bueno ya producido)
         return prev and prev.status == 'finished'
+
+    def upstream_good_qty(self, process_type):
+        """
+        Cuántas piezas buenas tiene disponibles el proceso anterior para que
+        este consuma. Si es el primero, retorna qty_assigned del lote.
+        """
+        route = self.product_type.get_process_route()
+        if process_type not in route:
+            return 0
+        idx = route.index(process_type)
+        if idx == 0:
+            return self.total_quantity
+        prev = self.records.filter(process_type=route[idx-1]).first()
+        return prev.qty_good if prev else 0
 
     def sync_records_qty(self):
         """
@@ -337,7 +352,9 @@ class ProcessRecord(models.Model):
     shift        = models.CharField(max_length=1, choices=SHIFT_CHOICES, blank=True)
     status       = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     qty_assigned = models.IntegerField()
-    qty_done     = models.IntegerField(default=0)  # acumulado de todos los turnos
+    qty_done     = models.IntegerField(default=0)  # acumulado de todos los turnos (buenas + defectuosas)
+    qty_defective= models.IntegerField(default=0)  # defectuosas que NO se han recuperado todavía
+    qty_scrapped = models.IntegerField(default=0)  # defectuosas descartadas definitivamente (merma)
     started_at   = models.DateTimeField(null=True, blank=True)   # primer arranque
     finished_at  = models.DateTimeField(null=True, blank=True)   # cuando se completó qty_assigned
     signature    = models.TextField(blank=True)
@@ -355,8 +372,21 @@ class ProcessRecord(models.Model):
         return PROCESS_LABELS.get(self.process_type, self.process_type.title())
 
     @property
+    def qty_good(self):
+        """Piezas conformes que pueden pasar al siguiente proceso."""
+        return max(0, self.qty_done - self.qty_defective)
+
+    @property
     def qty_remaining(self):
         return max(0, self.qty_assigned - self.qty_done)
+
+    @property
+    def qty_available_for_next(self):
+        """
+        Piezas disponibles para que el SIGUIENTE proceso las consuma.
+        Igual a qty_good si este proceso está finished/paused/in_process.
+        """
+        return self.qty_good
 
     @property
     def progress_pct(self):
@@ -399,37 +429,48 @@ class ProcessRecord(models.Model):
             self.batch.save(update_fields=['status', 'updated_at'])
         return entry
 
-    def end_shift(self, qty_done_this_shift, user, signature='', notes='', finalize=False):
+    def end_shift(self, qty_done_this_shift, user, signature='', notes='', finalize=False,
+                  qty_defective_this_shift=0):
         """
         Cierra el turno activo.
-        - Si total >= qty_assigned → finished
-        - Si finalize=True → finished aunque falten unidades (merma/material perdido)
-        - Sino → paused (queda disponible para otro operario)
+        - qty_done_this_shift: piezas producidas (buenas + defectuosas)
+        - qty_defective_this_shift: cuántas de esas salieron defectuosas (default 0)
+        Estado resultante:
+          - Si total >= qty_assigned → finished
+          - Si finalize=True → finished aunque falten unidades (merma de material)
+          - Sino → paused
         """
         from django.core.exceptions import ValidationError
         from django.db.models import Sum
         active = self.active_shift
         if not active:
             raise ValidationError('No hay un turno activo en este proceso.')
+        if qty_defective_this_shift < 0 or qty_defective_this_shift > qty_done_this_shift:
+            raise ValidationError('La cantidad defectuosa no puede exceder lo producido.')
 
-        active.qty_done    = qty_done_this_shift
-        active.finished_at = timezone.now()
-        active.signature   = signature
-        active.notes       = notes
+        active.qty_done      = qty_done_this_shift
+        active.qty_defective = qty_defective_this_shift
+        active.finished_at   = timezone.now()
+        active.signature     = signature
+        active.notes         = notes
         active.save()
 
-        # Recalcular acumulado
-        total = self.shift_entries.aggregate(s=Sum('qty_done'))['s'] or 0
-        self.qty_done   = total
-        self.signature  = signature  # firma del último turno (legacy)
+        # Recalcular acumulados desde los shifts
+        agg = self.shift_entries.aggregate(d=Sum('qty_done'), b=Sum('qty_defective'))
+        self.qty_done      = agg['d'] or 0
+        # Defectos pendientes = sum(defectivos en turnos) - sum(reworked+scrapped en reworks)
+        rework_agg = self.rework_entries.aggregate(r=Sum('qty_reworked'), s=Sum('qty_scrapped'))
+        resolved = (rework_agg['r'] or 0) + (rework_agg['s'] or 0)
+        self.qty_defective = max(0, (agg['b'] or 0) - resolved)
+        self.signature     = signature
 
-        if total >= self.qty_assigned or finalize:
+        if self.qty_done >= self.qty_assigned or finalize:
             self.status      = 'finished'
             self.finished_at = active.finished_at
         else:
-            self.status = 'paused'   # disponible para otro operario
+            self.status = 'paused'
 
-        self.save(update_fields=['qty_done','signature','status','finished_at'])
+        self.save(update_fields=['qty_done','qty_defective','signature','status','finished_at'])
 
         # Si el lote completó todos sus procesos → finished
         if self.status == 'finished' and not self.batch.records.exclude(status='finished').exists():
@@ -437,6 +478,36 @@ class ProcessRecord(models.Model):
             self.batch.save(update_fields=['status', 'updated_at'])
 
         return active
+
+    def process_rework(self, user, qty_reworked=0, qty_scrapped=0, notes=''):
+        """
+        Procesa parte del pool de defectuosos:
+        - qty_reworked: vuelven al flujo (cuentan como buenas para el siguiente proceso)
+        - qty_scrapped: descartadas como merma definitiva
+        La suma no puede exceder el pool actual de defectuosos.
+        """
+        from django.core.exceptions import ValidationError
+        total = qty_reworked + qty_scrapped
+        if total <= 0:
+            raise ValidationError('Indica cuántas se recuperaron y/o cuántas se descartaron.')
+        if total > self.qty_defective:
+            raise ValidationError(
+                f'No puede procesarse más que el pool actual ({self.qty_defective} defectuosas).'
+            )
+
+        ReworkEntry.objects.create(
+            process_record=self,
+            operator=user,
+            qty_reworked=qty_reworked,
+            qty_scrapped=qty_scrapped,
+            notes=notes,
+        )
+
+        # Reducir el pool de defectuosos
+        self.qty_defective = max(0, self.qty_defective - total)
+        # Las descartadas se contabilizan como scrap acumulado
+        self.qty_scrapped += qty_scrapped
+        self.save(update_fields=['qty_defective', 'qty_scrapped'])
 
     # ── Compatibilidad con código existente ────────────────
     def start(self, user, machine=None, shift=''):
@@ -454,7 +525,8 @@ class ProcessShiftEntry(models.Model):
     operator       = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='shift_entries')
     machine        = models.ForeignKey(Machine, on_delete=models.SET_NULL, null=True, blank=True, related_name='shift_entries')
     shift          = models.CharField(max_length=1, choices=SHIFT_CHOICES, blank=True)
-    qty_done       = models.IntegerField(default=0)
+    qty_done       = models.IntegerField(default=0)        # piezas producidas en el turno (buenas + defectuosas)
+    qty_defective  = models.IntegerField(default=0)        # cuántas de las producidas salieron defectuosas
     started_at     = models.DateTimeField()
     finished_at    = models.DateTimeField(null=True, blank=True)
     signature      = models.TextField(blank=True)
@@ -465,3 +537,22 @@ class ProcessShiftEntry(models.Model):
 
     def __str__(self):
         return f'{self.process_record} | {self.operator} ({self.qty_done})'
+
+
+class ReworkEntry(models.Model):
+    """
+    Cada vez que se procesa un grupo de defectuosos de un ProcessRecord:
+    parte se recupera (vuelve al flujo) y parte se descarta (merma definitiva).
+    """
+    process_record = models.ForeignKey(ProcessRecord, on_delete=models.CASCADE, related_name='rework_entries')
+    operator       = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='rework_entries')
+    qty_reworked   = models.IntegerField(default=0, verbose_name='Piezas recuperadas')
+    qty_scrapped   = models.IntegerField(default=0, verbose_name='Piezas descartadas (merma)')
+    notes          = models.TextField(blank=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.process_record} | rework {self.qty_reworked} / scrap {self.qty_scrapped}'

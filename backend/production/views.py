@@ -192,11 +192,17 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'No hay turno activo en este proceso.'}, status=400)
 
         qty = int(request.data.get('qty_done', 0))
+        qty_def = int(request.data.get('qty_defective', 0) or 0)
         finalize = request.data.get('finalize') in (True, 'true', '1', 1)
         remaining = record.qty_remaining
         if qty < 1 or qty > remaining:
             return Response(
                 {'detail': f'Cantidad inválida. Debe ser entre 1 y {remaining} (restante).'},
+                status=400,
+            )
+        if qty_def < 0 or qty_def > qty:
+            return Response(
+                {'detail': f'Defectuosas inválidas (entre 0 y {qty}).'},
                 status=400,
             )
         try:
@@ -206,6 +212,22 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 signature=request.data.get('signature', ''),
                 notes=request.data.get('notes', ''),
                 finalize=finalize,
+                qty_defective_this_shift=qty_def,
+            )
+        except Exception as e:
+            return Response({'detail': str(e)}, status=400)
+        return Response(ProcessRecordSerializer(record).data)
+
+    @action(detail=True, methods=['post'])
+    def rework(self, request, pk=None):
+        """Procesa parte del pool de defectuosos: recupera y/o descarta."""
+        record = self.get_object()
+        try:
+            record.process_rework(
+                user=request.user,
+                qty_reworked=int(request.data.get('qty_reworked', 0) or 0),
+                qty_scrapped=int(request.data.get('qty_scrapped', 0) or 0),
+                notes=request.data.get('notes', ''),
             )
         except Exception as e:
             return Response({'detail': str(e)}, status=400)
@@ -331,12 +353,21 @@ def supervisor_dashboard(request):
             'finished':   ProcessRecord.objects.filter(process_type=pt, status='finished').count(),
             'pending':    ProcessRecord.objects.filter(process_type=pt, status='pending').count(),
         }
+    # Lotes con defectos pendientes (qty_defective > 0 en al menos un proceso)
+    batches_with_defects = active.filter(records__qty_defective__gt=0).distinct()
+    from django.db.models import Sum
+    defect_agg = ProcessRecord.objects.filter(
+        batch__in=active, qty_defective__gt=0,
+    ).aggregate(total=Sum('qty_defective'))
+
     return Response({
         'process_stats': process_stats,
         'waiting_material': active.filter(status='waiting_material').count(),
         'in_basket':        active.filter(status='in_basket').count(),
         'in_process':       active.filter(status='in_process').count(),
         'finished':         active.filter(status='finished').count(),
+        'with_defects':     batches_with_defects.count(),
+        'defective_qty':    defect_agg['total'] or 0,
         'total':            active.count(),
     })
 

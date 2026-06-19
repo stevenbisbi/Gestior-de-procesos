@@ -58,6 +58,7 @@ export const Records = {
   get:    (id)         => api.get(`/records/${id}/`),
   start:  (id, data)   => api.post(`/records/${id}/start/`, data),
   finish: (id, data)   => api.post(`/records/${id}/finish/`, data),
+  rework: (id, data)   => api.post(`/records/${id}/rework/`, data),
 };
 
 export const Catalog = {
