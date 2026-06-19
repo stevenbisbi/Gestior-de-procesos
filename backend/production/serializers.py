@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception
+from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception, ReworkEntry
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -62,8 +62,18 @@ class ProcessShiftEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model  = ProcessShiftEntry
         fields = ['id', 'process_record', 'operator', 'operator_data', 'machine', 'machine_data',
-                  'shift', 'shift_display', 'qty_done', 'started_at', 'finished_at',
-                  'signature', 'notes']
+                  'shift', 'shift_display', 'qty_done', 'qty_defective',
+                  'started_at', 'finished_at', 'signature', 'notes']
+
+
+class ReworkEntrySerializer(serializers.ModelSerializer):
+    operator_data = UserMiniSerializer(source='operator', read_only=True)
+
+    class Meta:
+        model  = ReworkEntry
+        fields = ['id', 'process_record', 'operator', 'operator_data',
+                  'qty_reworked', 'qty_scrapped', 'notes', 'created_at']
+        read_only_fields = ['created_at']
 
 
 class ProcessRecordSerializer(serializers.ModelSerializer):
@@ -73,8 +83,10 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
     machine_data   = MachineSerializer(source='machine', read_only=True)
     has_quality_check = serializers.SerializerMethodField()
     qty_remaining  = serializers.IntegerField(read_only=True)
+    qty_good       = serializers.IntegerField(read_only=True)
     progress_pct   = serializers.IntegerField(read_only=True)
     shift_entries  = ProcessShiftEntrySerializer(many=True, read_only=True)
+    rework_entries = ReworkEntrySerializer(many=True, read_only=True)
     active_shift_operator = serializers.SerializerMethodField()
     # Datos del lote para evitar fetchs extra en frontend
     batch_code             = serializers.CharField(source='batch.batch_code',     read_only=True)
@@ -87,8 +99,10 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
         fields = ['id','batch','batch_code','batch_priority','batch_priority_display','product_name',
                   'process_type','process_label','sequence','machine','machine_data',
                   'operator','operator_data','shift','status','status_display','qty_assigned',
-                  'qty_done','qty_remaining','progress_pct','started_at','finished_at',
-                  'notes','signature','has_quality_check','shift_entries','active_shift_operator']
+                  'qty_done','qty_remaining','qty_good','qty_defective','qty_scrapped',
+                  'progress_pct','started_at','finished_at',
+                  'notes','signature','has_quality_check',
+                  'shift_entries','rework_entries','active_shift_operator']
         read_only_fields = ['signature']
 
     def get_process_label(self, obj):
