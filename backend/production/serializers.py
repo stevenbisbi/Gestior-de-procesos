@@ -85,6 +85,8 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
     qty_remaining  = serializers.IntegerField(read_only=True)
     qty_good       = serializers.IntegerField(read_only=True)
     progress_pct   = serializers.IntegerField(read_only=True)
+    sections_per_tube = serializers.IntegerField(read_only=True)
+    tubes_remaining   = serializers.SerializerMethodField()
     shift_entries  = ProcessShiftEntrySerializer(many=True, read_only=True)
     rework_entries = ReworkEntrySerializer(many=True, read_only=True)
     active_shift_operator = serializers.SerializerMethodField()
@@ -100,13 +102,17 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
                   'process_type','process_label','sequence','machine','machine_data',
                   'operator','operator_data','shift','status','status_display','qty_assigned',
                   'qty_done','qty_remaining','qty_good','qty_defective','qty_scrapped',
-                  'progress_pct','started_at','finished_at',
+                  'progress_pct','sections_per_tube','tubes_remaining',
+                  'started_at','finished_at',
                   'notes','signature','has_quality_check',
                   'shift_entries','rework_entries','active_shift_operator']
         read_only_fields = ['signature']
 
     def get_process_label(self, obj):
         return obj.get_process_label()
+
+    def get_tubes_remaining(self, obj):
+        return obj.tubes_remaining
 
     def get_has_quality_check(self, obj):
         return hasattr(obj, 'quality_check')

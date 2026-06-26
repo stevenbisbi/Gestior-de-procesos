@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Dashboard } from '../lib/api';
-import { Loading, ProcIcon, StatusBadge, PriorityTag } from '../components/Common';
+import { Loading, Alert, ProcIcon, StatusBadge, PriorityTag } from '../components/Common';
 import { PROCESS_ICONS, formatDateTime } from '../lib/utils';
 
 const PRIORITY_ORDER = { alta: 0, media: 1, baja: 2 };
@@ -17,12 +17,26 @@ const PRIORITY_RING = {
 export default function OperatorDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    Dashboard.operatorTasks().then(setData).finally(() => setLoading(false));
+    Dashboard.operatorTasks()
+      .then(d => { setData(d); setError(null); })
+      .catch(e => setError(e.message || 'No se pudieron cargar tus tareas.'))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loading />;
+
+  // Si la API falló, mostramos el error real en vez de "Todo al día" (que ocultaba el problema)
+  if (error) {
+    return (
+      <Alert kind="error">
+        No se pudieron cargar tus tareas: {error}. Recarga la página o avisa al supervisor.
+      </Alert>
+    );
+  }
+
   const raw = data || {};
   const my_active = [...(raw.my_active || [])].sort(sortByPriority);
   const pending   = [...(raw.pending   || [])].sort(sortByPriority);
@@ -53,7 +67,6 @@ export default function OperatorDashboard() {
                   <ProcIcon type={rec.process_type} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="font-mono text-xs text-slate-400">{rec.batch_code || `#${rec.batch}`}</span>
                       <PriorityTag priority={rec.batch_priority} />
                     </div>
                     <div className="font-semibold">{rec.process_label}
@@ -106,7 +119,6 @@ export default function OperatorDashboard() {
                   <ProcIcon type={rec.process_type} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="font-mono text-xs text-slate-400">{rec.batch_code || `#${rec.batch}`}</span>
                       <PriorityTag priority={rec.batch_priority} />
                     </div>
                     <div className="font-semibold">{rec.process_label}

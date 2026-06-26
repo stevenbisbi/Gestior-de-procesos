@@ -276,6 +276,16 @@ function ProcessRecordCard({ rec, batch, canStart, canFinish, onChange }) {
                    style={{ width: `${rec.progress_pct}%` }}/>
             </div>
           )}
+
+          {/* Tubos largos restantes en canasta (solo corte) */}
+          {rec.process_type === 'corte' && rec.tubes_remaining != null && (
+            <div className="text-xs text-slate-500 mt-1.5">
+              🪵 <strong className="text-slate-700">{rec.tubes_remaining}</strong> tubos largos en canasta
+              {rec.sections_per_tube > 0 && (
+                <span className="text-slate-400"> · {rec.sections_per_tube} tramos/tubo</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
           <StatusBadge status={status} />

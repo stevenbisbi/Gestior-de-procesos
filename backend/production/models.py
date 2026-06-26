@@ -395,6 +395,39 @@ class ProcessRecord(models.Model):
         return int((self.qty_done / self.qty_assigned) * 100)
 
     @property
+    def sections_per_tube(self):
+        """Cuántos tramos de corte salen de un tubo largo (longitud original ÷ corte)."""
+        pt  = self.batch.product_type
+        ts  = pt.tube_spec if pt else None
+        cut = pt.cut_length if pt else 0
+        if not ts or not ts.original_length or not cut or cut <= 0:
+            return 0
+        import math
+        return math.floor(ts.original_length / cut)
+
+    @property
+    def tubes_remaining(self):
+        """
+        Tubos largos que aún quedan en canasta para este lote, estimados a
+        partir de lo ya cortado. Solo aplica al proceso de corte.
+            tubes_remaining = tubos_recibidos − floor(qty_done / sections_per_tube)
+        Retorna None si no aplica (no es corte, sin recepciones, o sin datos de corte).
+        """
+        if self.process_type != 'corte':
+            return None
+        spt = self.sections_per_tube
+        if spt <= 0:
+            return None
+        from django.db.models import Sum
+        agg = self.batch.material_receptions.aggregate(total=Sum('quantity'))
+        received = agg['total'] or 0
+        if received <= 0:
+            return None
+        import math
+        consumed = math.floor(self.qty_done / spt)
+        return max(0, received - consumed)
+
+    @property
     def active_shift(self):
         """Turno actualmente en curso (sin finished_at), o None."""
         return self.shift_entries.filter(finished_at__isnull=True).first()

@@ -61,6 +61,17 @@ export default function ProcessFinish() {
   const willFinish   = reachesTotal || finalize;
   const shortage     = remaining - numericQty;  // unidades que faltarían si finaliza
 
+  // Estimación de tubos largos que quedarían en canasta tras este turno (solo corte)
+  const sectionsPerTube = record.sections_per_tube || 0;
+  const isCorte         = record.process_type === 'corte';
+  let projectedTubes = null;
+  if (isCorte && sectionsPerTube > 0 && record.tubes_remaining != null) {
+    const currentConsumed   = Math.floor(record.qty_done / sectionsPerTube);
+    const tubesReceived     = record.tubes_remaining + currentConsumed;
+    const projectedConsumed = Math.floor((record.qty_done + numericQty) / sectionsPerTube);
+    projectedTubes = Math.max(0, tubesReceived - projectedConsumed);
+  }
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true); setError(null);
@@ -88,7 +99,7 @@ export default function ProcessFinish() {
         <ProcIcon type={record.process_type} />
         <div className="flex-1">
           <div className="font-bold">{record.process_label}</div>
-          <div className="text-xs text-slate-400">Lote #{record.batch}</div>
+          {record.product_name && <div className="text-xs text-slate-400">{record.product_name}</div>}
         </div>
         <StatusBadge status="in_process" />
       </div>
@@ -194,6 +205,25 @@ export default function ProcessFinish() {
 
           </div>
         </div>
+
+        {/* Tubos largos restantes en canasta (estimado — solo corte) */}
+        {projectedTubes !== null && (
+          <div className="card">
+            <div className="card-body">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-slate-600">
+                  🪵 Tubos largos que quedarían en canasta
+                  <div className="text-[11px] text-slate-400">
+                    Estimado: {sectionsPerTube} tramos por tubo
+                  </div>
+                </div>
+                <div className="text-2xl font-mono font-bold text-slate-700">
+                  {projectedTubes}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Info */}
         <div className="card">

@@ -85,7 +85,9 @@ class MachineViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProductionBatchViewSet(viewsets.ModelViewSet):
     queryset = ProductionBatch.objects.select_related('product_type__tube_spec') \
-                                       .prefetch_related('records__machine','records__operator')
+                                       .prefetch_related('records__machine','records__operator',
+                                                         'records__shift_entries','records__rework_entries',
+                                                         'material_receptions')
 
     def get_serializer_class(self):
         return BatchListSerializer if self.action == 'list' else ProductionBatchSerializer
@@ -156,7 +158,8 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
 # ─── Process Records ────────────────────────────────────
 
 class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProcessRecord.objects.select_related('batch__product_type__tube_spec','machine','operator')
+    queryset = ProcessRecord.objects.select_related('batch__product_type__tube_spec','machine','operator') \
+                                    .prefetch_related('shift_entries','rework_entries','batch__material_receptions')
     serializer_class = ProcessRecordSerializer
 
     @action(detail=True, methods=['post'])
@@ -450,7 +453,8 @@ def operator_tasks(request):
         process_type__in=process_types,
         status__in=['pending', 'in_process', 'paused'],
         batch__status__in=['in_basket', 'in_process']
-    ).select_related('batch__product_type__tube_spec', 'machine')
+    ).select_related('batch__product_type__tube_spec', 'machine') \
+     .prefetch_related('shift_entries', 'rework_entries', 'batch__material_receptions')
 
     # "Mis activos": turnos que YO tengo abiertos en este momento
     my_active   = available.filter(status='in_process', operator=request.user)
