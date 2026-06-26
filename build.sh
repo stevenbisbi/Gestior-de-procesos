@@ -38,6 +38,10 @@ echo "   4/4 — Migrate y collectstatic"
 echo "═══════════════════════════════════════════════"
 python manage.py collectstatic --no-input
 python manage.py migrate --no-input
+# Auto-reparación: si la migración 0007 quedó registrada pero sin sus columnas
+# (estado inconsistente que rompe recibir material y tareas del operario),
+# este comando crea lo que falte. Es idempotente: si todo está bien, no hace nada.
+python manage.py ensure_schema
 
 # Seed solo si se pide explícitamente (env var RUN_SEED=1).
 # El seed BORRA y RECREA datos transaccionales, no querés que corra en
