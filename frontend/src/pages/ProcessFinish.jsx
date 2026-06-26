@@ -52,7 +52,10 @@ export default function ProcessFinish() {
   if (!record) return <Loading />;
 
   const remaining   = record.qty_remaining ?? (record.qty_assigned - record.qty_done);
-  const numericQty  = Math.max(1, Math.min(remaining, parseInt(qtyDone) || 1));
+ const numericQty = Math.max(
+  0,
+  Math.min(remaining, Number.isNaN(parseInt(qtyDone)) ? 0 : parseInt(qtyDone))
+);
   // El proceso se completa si se alcanza el total O si el operario marca "finalizar"
   const reachesTotal = numericQty >= remaining;
   const willFinish   = reachesTotal || finalize;
@@ -144,11 +147,12 @@ export default function ProcessFinish() {
                 ⚠️ Vas a <strong>finalizar la referencia</strong> con {shortage.toLocaleString()} uds menos
                 (pérdida de material). El proceso quedará Terminado y nadie continuará el saldo.
               </div>
-            ) : (
+            ) : remaining > 0 ? (
+              
               <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
                 ⏸ Quedarán <strong>{shortage.toLocaleString()} uds</strong> pendientes. Otro operario (o vos en otro momento) podrá continuarlas.
               </div>
-            )}
+            ) : null}
 
             {/* Finalizar aunque falten unidades (merma) */}
             {!reachesTotal && (
@@ -188,13 +192,6 @@ export default function ProcessFinish() {
               <span className="text-sm text-slate-600">defectuosas</span>
             </div>
 
-            {(parseInt(qtyDefective) || 0) > 0 && (
-              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-800">
-                🔧 Quedan <strong>{(parseInt(qtyDefective) || 0).toLocaleString()} piezas defectuosas</strong> en
-                el pool de rework. El siguiente proceso solo verá <strong>{(numericQty - (parseInt(qtyDefective) || 0)).toLocaleString()}</strong> disponibles
-                hasta que se reparen o descarten desde <em>Lotes → Defectuosos</em>.
-              </div>
-            )}
           </div>
         </div>
 
@@ -225,9 +222,10 @@ export default function ProcessFinish() {
               <label className="form-label">Turno</label>
               <select value={shift} onChange={e => setShift(e.target.value)} className="form-select">
                 <option value="">Seleccionar...</option>
-                <option value="A">Turno A (06:00–14:00)</option>
-                <option value="B">Turno B (14:00–22:00)</option>
-                <option value="C">Turno C (22:00–06:00)</option>
+                <option value="A">Turno 1 (06:00–15:15)</option>
+                <option value="A">Turno 2 (06:00–14:00)</option>
+                <option value="B">Turno 3 (14:00–22:00)</option>
+                <option value="C">Turno 5 (22:00–06:00)</option>
               </select>
             </div>
             <div>

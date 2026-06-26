@@ -34,11 +34,27 @@ poetry install --only main --no-interaction --no-ansi
 
 echo ""
 echo "═══════════════════════════════════════════════"
-echo "   4/4 — Migrate, collectstatic y seed"
+echo "   4/4 — Migrate y collectstatic"
 echo "═══════════════════════════════════════════════"
 python manage.py collectstatic --no-input
 python manage.py migrate --no-input
-python setup_initial_data.py
+
+# Seed solo si se pide explícitamente (env var RUN_SEED=1).
+# El seed BORRA y RECREA datos transaccionales, no querés que corra en
+# cada deploy si ya hay info real cargada.
+#
+# Cómo correrlo cuando lo necesites:
+#   - Render dashboard → Environment → agregá RUN_SEED=1 → Save & Deploy
+#   - Después de que se siembre, BORRÁ la variable para los próximos deploys
+#   - O entrá al Shell del servicio y corré: python setup_initial_data.py
+if [ "${RUN_SEED:-0}" = "1" ]; then
+    echo ""
+    echo "⚠️  RUN_SEED=1 detectado — corriendo seed (borra datos transaccionales)"
+    python setup_initial_data.py
+else
+    echo ""
+    echo "ℹ️  Seed omitida (RUN_SEED no está en 1). Datos preservados."
+fi
 
 echo ""
 echo "✅ Build completo — listo para arrancar"
