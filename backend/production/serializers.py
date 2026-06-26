@@ -145,13 +145,19 @@ class BatchListSerializer(serializers.ModelSerializer):
     priority_display  = serializers.CharField(source='get_priority_display', read_only=True)
     current_process   = serializers.SerializerMethodField()
     process_route     = serializers.SerializerMethodField()
+    tubes_received    = serializers.SerializerMethodField()
 
     class Meta:
         model  = ProductionBatch
         fields = ['id','batch_code','product_name','tube_label','cut_length',
                   'total_quantity','priority','priority_display','scheduled_date',
                   'status','status_display','progress_pct','current_process',
-                  'process_route','created_at']
+                  'process_route','tubes_received','created_at']
+
+    def get_tubes_received(self, obj):
+        from django.db.models import Sum
+        agg = obj.material_receptions.aggregate(total=Sum('quantity'))
+        return agg['total'] or 0
 
     def get_current_process(self, obj):
         rec = obj.records.exclude(status='finished').order_by('sequence').first()

@@ -302,10 +302,11 @@ function StandaloneReceiveModal({ user, onClose, onReceived }) {
 
 // ── Fila de lote (waiting o ready) ──────────────────────────────────────────
 function BatchRow({ batch, mode, onReceive }) {
-  const tube = batch.tube_label || batch.product_type_data?.tube_spec_data?.label;
-  const productName = batch.product_name || batch.product_type_data?.name;
-  const cutLength   = batch.cut_length   || batch.product_type_data?.cut_length;
-  const isWaiting   = mode === 'waiting';
+  const tube          = batch.tube_label || batch.product_type_data?.tube_spec_data?.label;
+  const productName   = batch.product_name || batch.product_type_data?.name;
+  const cutLength     = batch.cut_length   || batch.product_type_data?.cut_length;
+  const tubesReceived = batch.tubes_received ?? 0;
+  const isWaiting     = mode === 'waiting';
 
   return (
     <div className={`bg-white rounded-xl border-l-4 border border-slate-100 shadow-sm p-3.5 flex items-center gap-3
@@ -327,6 +328,11 @@ function BatchRow({ batch, mode, onReceive }) {
           {' · '}
           <strong>{batch.total_quantity?.toLocaleString()}</strong> uds
         </div>
+        {tubesReceived > 0 && (
+          <div className="text-xs text-slate-400 mt-0.5">
+            🪵 <strong className="text-slate-600">{tubesReceived}</strong> tubos largos en planta
+          </div>
+        )}
         {batch.scheduled_date && (
           <div className="text-[11px] text-slate-400 mt-0.5">📅 Programado: {formatDate(batch.scheduled_date)}</div>
         )}
