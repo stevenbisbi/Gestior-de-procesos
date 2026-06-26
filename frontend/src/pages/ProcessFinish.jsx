@@ -21,6 +21,8 @@ export default function ProcessFinish() {
   const [error, setError]         = useState(null);
   const [saving, setSaving]       = useState(false);
   const [finalize, setFinalize]   = useState(false); // finalizar referencia aunque falten uds
+  const [done, setDone]           = useState(false);
+  const [tubosRestantes, setTubosRestantes] = useState(null);
 
   useEffect(() => {
     Records.get(id).then(r => {
@@ -51,6 +53,35 @@ export default function ProcessFinish() {
 
   if (!record) return <Loading />;
 
+  if (done) {
+    return (
+      <div className="max-w-xl text-center space-y-4 py-8">
+        <div className="text-6xl">✅</div>
+        <h2 className="text-2xl font-bold text-slate-800">Proceso finalizado</h2>
+        <p className="text-slate-500">{record.process_label} · {record.product_name}</p>
+        {tubosRestantes !== null && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-left">
+            <div className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">Tubos largos en planta</div>
+            <div className="flex items-center gap-3">
+              <span className="text-4xl">🪵</span>
+              <div>
+                <span className="text-3xl font-bold text-amber-800">{tubosRestantes}</span>
+                <span className="text-amber-700 ml-2">tubo{tubosRestantes !== 1 ? 's' : ''} sobrante{tubosRestantes !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            {tubosRestantes === 0 && (
+              <p className="text-xs text-amber-600 mt-2">Se consumieron todos los tubos de esta recepción.</p>
+            )}
+          </div>
+        )}
+        <button onClick={() => nav(`/lote/${record.batch}`)}
+          className="btn btn-outline px-6 py-2">
+          Ver lote
+        </button>
+      </div>
+    );
+  }
+
   const remaining   = record.qty_remaining ?? (record.qty_assigned - record.qty_done);
  const numericQty = Math.max(
   0,
@@ -66,13 +97,16 @@ export default function ProcessFinish() {
     setSaving(true); setError(null);
     try {
       const numDef = Math.max(0, Math.min(numericQty, parseInt(qtyDefective) || 0));
-      await Records.finish(id, {
+      const result = await Records.finish(id, {
         qty_done:      numericQty,
         qty_defective: numDef,
         signature, notes,
         finalize:  finalize || reachesTotal,
       });
-      nav(`/lote/${record.batch}`);
+      if (result.tubes_remaining !== null && result.tubes_remaining !== undefined) {
+        setTubosRestantes(result.tubes_remaining);
+      }
+      setDone(true);
     } catch (err) {
       setError(err.message);
     } finally { setSaving(false); }
@@ -88,7 +122,7 @@ export default function ProcessFinish() {
         <ProcIcon type={record.process_type} />
         <div className="flex-1">
           <div className="font-bold">{record.process_label}</div>
-          <div className="text-xs text-slate-400">Lote #{record.batch}</div>
+          {record.product_name && <div className="text-xs text-slate-400">{record.product_name}</div>}
         </div>
         <StatusBadge status="in_process" />
       </div>

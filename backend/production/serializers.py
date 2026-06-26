@@ -88,6 +88,7 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
     shift_entries  = ProcessShiftEntrySerializer(many=True, read_only=True)
     rework_entries = ReworkEntrySerializer(many=True, read_only=True)
     active_shift_operator = serializers.SerializerMethodField()
+    tubes_remaining = serializers.SerializerMethodField()
     # Datos del lote para evitar fetchs extra en frontend
     batch_code             = serializers.CharField(source='batch.batch_code',     read_only=True)
     batch_priority         = serializers.CharField(source='batch.priority',        read_only=True)
@@ -102,7 +103,7 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
                   'qty_done','qty_remaining','qty_good','qty_defective','qty_scrapped',
                   'progress_pct','started_at','finished_at',
                   'notes','signature','has_quality_check',
-                  'shift_entries','rework_entries','active_shift_operator']
+                  'shift_entries','rework_entries','active_shift_operator','tubes_remaining']
         read_only_fields = ['signature']
 
     def get_process_label(self, obj):
@@ -116,6 +117,21 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
         if active and active.operator:
             return UserMiniSerializer(active.operator).data
         return None
+
+    def get_tubes_remaining(self, obj):
+        if obj.process_type != 'corte':
+            return None
+        import math
+        received = obj.batch.material_receptions.aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        if received == 0:
+            return None
+        program_line = getattr(obj.batch, 'program_line', None)
+        if not program_line or not program_line.sections_per_tube:
+            return None
+        tubes_consumed = math.floor(obj.qty_done / program_line.sections_per_tube)
+        return max(0, received - tubes_consumed)
 
 
 class ProductionBatchSerializer(serializers.ModelSerializer):
