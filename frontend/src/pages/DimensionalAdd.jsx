@@ -112,15 +112,10 @@ export default function DimensionalAdd() {
               </div>
               <div className="space-y-3">
                 {[1, 2, 3].map(n => (
-                  <div key={n} className="grid grid-cols-2 gap-2">
+                  <div key={n} className="d-flex gap-2 items-center">
+                    
                     <div>
-                      <label className="form-label text-[11px]">{n === 1 ? 'Etiqueta' : 'Etiqueta (opcional)'}</label>
-                      <input value={form[`measure_label_${n}`]}
-                        onChange={e => setField(`measure_label_${n}`, e.target.value)}
-                        className="form-input" />
-                    </div>
-                    <div>
-                      <label className="form-label text-[11px]">{n === 1 ? 'Valor *' : 'Valor (opcional)'}</label>
+                      <label className="form-label text-[11px]">{n === 1 ? 'Longitud (mm) *' : 'Longitud (mm) (opcional)'}</label>
                       <input required={n === 1} value={form[`measure_${n}`]}
                         onChange={e => setField(`measure_${n}`, e.target.value)}
                         placeholder={n === 1 ? 'Ej: 838.1 mm' : ''}

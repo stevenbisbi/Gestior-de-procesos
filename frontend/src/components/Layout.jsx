@@ -5,7 +5,7 @@ const TabsSupervisor = [
   { to: '/supervisor',     label: 'Resumen',     icon: '📊' },
   { to: '/maquinas',       label: 'Máquinas',    icon: '🏭' },
   { to: '/lotes',          label: 'Lotes',       icon: '📦' },
-  { to: '/programa',       label: 'Programa',    icon: '✂️' },
+  { to: '/programa',       label: 'Programa',    icon: '📝' },
   { to: '/canasta',        label: 'Canasta',     icon: '🧺' },
   { to: '/defectuosos',    label: 'Defectuosos', icon: '🔧' },
   { to: '/calidad/reporte',label: 'Calidad',     icon: '✓'  },
@@ -14,7 +14,7 @@ const TabsSupervisor = [
 // Para operarios de corte (Bewo): programa + canasta de tubería
 const TabsOperatorCorte = [
   { to: '/operario',       label: 'Mis tareas', icon: '🛠' },
-  { to: '/corte/programa', label: 'Programa',   icon: '✂️' },
+  { to: '/corte/programa', label: 'Programa',   icon: '📝' },
   { to: '/canasta',        label: 'Canasta',    icon: '🧺' },
 ];
 
