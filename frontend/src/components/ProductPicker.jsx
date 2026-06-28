@@ -191,6 +191,7 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
   const [tube, setTube] = useState({
     shape: 'round', outer_diameter: '', thickness: '',
     material: 'hr', original_length: 6000,
+    saw_type: 'none', rpm: '',   // ← sierra y rpm viven en el tubo largo
   });
 
   // — ProductType —
@@ -198,7 +199,6 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
     name: initialName, item_code: '', cut_length: '', client: '',
     default_priority: 'media',
     requires_chaflan: false, requires_moleteo: false, requires_curvado: false,
-    saw_type: 'none', rpm: '',
   });
 
   const [saving, setSaving] = useState(false);
@@ -232,6 +232,8 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
             thickness:       th,
             material:        tube.material,
             original_length: ol,
+            saw_type:        tube.saw_type,
+            rpm:             tube.rpm ? Number(tube.rpm) : null,
           });
           onTubeCreated(newTube);
           tubeSpecId = newTube.id;
@@ -243,12 +245,11 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
         return;
       }
 
-      // 2) Crear ProductType
+      // 2) Crear ProductType (saw_type/rpm los hereda del tubo, no se envían)
       const newProduct = await Catalog.createProduct({
         ...prod,
         tube_spec:        Number(tubeSpecId),
         cut_length:       Number(prod.cut_length),
-        rpm:              prod.rpm ? Number(prod.rpm) : null,
       });
       onCreated(newProduct);
     } catch (ex) {
@@ -328,7 +329,25 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
                       value={tube.original_length}
                       onChange={e => setTube(s => ({...s, original_length: e.target.value}))}/>
                   </Field>
+                  <Field label="Tipo de sierra" hint="Parámetro de corte del tubo">
+                    <select className={selCls} value={tube.saw_type}
+                      onChange={e => setTube(s => ({...s, saw_type: e.target.value}))}>
+                      <option value="none">Ninguno</option>
+                      <option value="hss">HSS</option>
+                      <option value="tct">TCT</option>
+                    </select>
+                  </Field>
+                  <Field label="RPM">
+                    <input type="number" className={inpCls}
+                      value={tube.rpm}
+                      onChange={e => setTube(s => ({...s, rpm: e.target.value}))}/>
+                  </Field>
                 </div>
+              )}
+              {tubeMode === 'existing' && (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  El tipo de sierra y RPM se heredan del tubo seleccionado.
+                </p>
               )}
             </div>
 
@@ -364,19 +383,6 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
                     <option value="media">Media</option>
                     <option value="baja">Baja</option>
                   </select>
-                </Field>
-                <Field label="Tipo de sierra">
-                  <select className={selCls} value={prod.saw_type}
-                    onChange={e => setProd(s => ({...s, saw_type: e.target.value}))}>
-                    <option value="none">Ninguno</option>
-                    <option value="hss">HSS</option>
-                    <option value="tct">TCT</option>
-                  </select>
-                </Field>
-                <Field label="RPM">
-                  <input type="number" className={inpCls}
-                    value={prod.rpm}
-                    onChange={e => setProd(s => ({...s, rpm: e.target.value}))}/>
                 </Field>
               </div>
 

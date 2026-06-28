@@ -144,12 +144,19 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='dispatch')
     def dispatch_batch(self, request, pk=None):
+        """
+        Despacha el lote.
+        - Sin payload o con all=true → despacha todos los medios pendientes (o el lote completo
+          si el producto no usa medios de manejo).
+        - Con unit_ids=[...] → despacha solo esos medios (despacho parcial).
+        """
         batch = self.get_object()
-        if batch.status != 'finished':
-            return Response({'detail': 'El lote debe estar terminado para despachar.'}, status=400)
-        batch.status = 'dispatched'
-        batch.dispatched_at = timezone.now()
-        batch.save()
+        dispatch_all = request.data.get('all') in (True, 'true', '1', 1) or not request.data.get('unit_ids')
+        unit_ids = request.data.get('unit_ids') or []
+        try:
+            batch.dispatch_units(unit_ids=unit_ids, dispatch_all=dispatch_all)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=400)
         return Response(ProductionBatchSerializer(batch).data)
 
 
@@ -216,6 +223,14 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
             )
         except Exception as e:
             return Response({'detail': str(e)}, status=400)
+
+        # Medios de manejo (estibas/cajas) reportados en este turno — solo proceso final
+        packing = request.data.get('packing_units') or []
+        if packing and record.process_type == record.batch.product_type.final_process:
+            quantities = [int(q) for q in packing if int(q or 0) > 0]
+            if quantities:
+                record.batch.add_packing_units(request.user, quantities)
+
         return Response(ProcessRecordSerializer(record).data)
 
     @action(detail=True, methods=['post'])

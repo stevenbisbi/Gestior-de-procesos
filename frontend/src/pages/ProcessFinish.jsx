@@ -21,6 +21,7 @@ export default function ProcessFinish() {
   const [error, setError]         = useState(null);
   const [saving, setSaving]       = useState(false);
   const [finalize, setFinalize]   = useState(false); // finalizar referencia aunque falten uds
+  const [packingUnits, setPackingUnits] = useState([]); // cantidades por estiba/caja
 
   useEffect(() => {
     Records.get(id).then(r => {
@@ -61,16 +62,25 @@ export default function ProcessFinish() {
   const willFinish   = reachesTotal || finalize;
   const shortage     = remaining - numericQty;  // unidades que faltarían si finaliza
 
+  // Medios de manejo (estibas/cajas) — solo en el proceso final
+  const packType   = record.is_final_process ? record.packing_unit_type : null;
+  const packLabel  = packType === 'estiba' ? 'estiba' : packType === 'caja' ? 'caja' : null;
+  const packPlural = packType === 'estiba' ? 'estibas' : 'cajas';
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true); setError(null);
     try {
       const numDef = Math.max(0, Math.min(numericQty, parseInt(qtyDefective) || 0));
+      const packing = packType
+        ? packingUnits.map(q => parseInt(q) || 0).filter(q => q > 0)
+        : [];
       await Records.finish(id, {
         qty_done:      numericQty,
         qty_defective: numDef,
         signature, notes,
         finalize:  finalize || reachesTotal,
+        packing_units: packing,
       });
       nav(`/lote/${record.batch}`);
     } catch (err) {
@@ -194,6 +204,49 @@ export default function ProcessFinish() {
 
           </div>
         </div>
+
+        {/* Medios de manejo (estibas / cajas) — solo proceso final */}
+        {packType && (
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">¿Cuántas {packPlural} dejaste listas?</span>
+              <span className="text-xs text-slate-400">Una por cada {packLabel}</span>
+            </div>
+            <div className="card-body space-y-2">
+              <p className="text-xs text-slate-500">
+                Ingresá la cantidad de piezas de cada {packLabel} completada en este turno.
+                Lo que no alcance a llenar una {packLabel} se completa en el siguiente turno.
+              </p>
+
+              {packingUnits.map((q, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-sm text-slate-500 w-20">{packLabel} {i + 1}</span>
+                  <input type="number" min="1" value={q}
+                    onChange={e => setPackingUnits(u => u.map((v, idx) => idx === i ? e.target.value : v))}
+                    placeholder="ej. 120"
+                    className="flex-1 border-2 border-slate-200 rounded-lg px-3 py-1.5 text-center font-mono bg-slate-50 outline-none focus:border-blue-400" />
+                  <span className="text-xs text-slate-500">pzs</span>
+                  <button type="button"
+                    onClick={() => setPackingUnits(u => u.filter((_, idx) => idx !== i))}
+                    className="w-7 h-7 rounded-full border bg-white hover:border-red-400 text-red-500 text-sm">✕</button>
+                </div>
+              ))}
+
+              <button type="button"
+                onClick={() => setPackingUnits(u => [...u, ''])}
+                className="btn btn-outline btn-sm w-full">
+                + Agregar {packLabel}
+              </button>
+
+              {packingUnits.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-800">
+                  📦 {packingUnits.filter(q => parseInt(q) > 0).length} {packPlural} ·{' '}
+                  {packingUnits.reduce((s, q) => s + (parseInt(q) || 0), 0).toLocaleString()} piezas empacadas
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Info */}
         <div className="card">

@@ -51,7 +51,7 @@ export const Batches = {
   create:  (data)        => api.post('/batches/', data),
   update:  (id, data)    => api.patch(`/batches/${id}/`, data),
   receive: (id, data)    => api.post(`/batches/${id}/receive/`, data || {}),
-  dispatch:(id)          => api.post(`/batches/${id}/dispatch/`),  // url_path='dispatch' on backend
+  dispatch:(id, data)    => api.post(`/batches/${id}/dispatch/`, data || {}),
 };
 
 export const Records = {

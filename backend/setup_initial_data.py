@@ -77,22 +77,23 @@ for uname, fn, ln, grp in users_data:
     U[uname] = User.objects.get(username=uname)
 
 # ── Especificaciones de tubo (extraídas del programa real de la planta) ──────
+# saw_type y rpm AHORA viven en el tubo largo (el producto los hereda).
 tubes_data = [
-    # (shape, outer_diameter, thickness, material, original_length)
-    ('round',  '5/8',    0.7, 'cr',     6000),  # TUB CR REDONDO 5/8
-    ('round',  '3/4',    0.7, 'cr',     6000),  # TUB CR REDONDO 3/4
-    ('round',  '1/2',    0.6, 'cr',     6000),  # TUB CR REDONDO 1/2
-    ('round',  '22.2',   2.0, 'cr',     6000),  # TUBO 22.2 CAL 2.0 (manubrios)
-    ('round',  '25.4',   1.5, 'cr',     6000),  # TUBO 25.4 CAL 1.5
-    ('round',  '15.88',  2.0, 'hr_est', 6000),  # TUBO 15.88 HR EST CAL 2.0
-    ('square', '20x40',  1.6, 'cr',     6000),  # TUBO RECTANGULAR 20x40 EC SPFC 390
-    ('round',  '6.35',   1.0, 'cr',     6000),  # BARRA CALIBRADA 1016
+    # (shape, outer_diameter, thickness, material, original_length, saw_type, rpm)
+    ('round',  '5/8',    0.7, 'cr',     6000, 'hss', 2400),  # TUB CR REDONDO 5/8
+    ('round',  '3/4',    0.7, 'cr',     6000, 'hss', 2400),  # TUB CR REDONDO 3/4
+    ('round',  '1/2',    0.6, 'cr',     6000, 'hss', 2600),  # TUB CR REDONDO 1/2
+    ('round',  '22.2',   2.0, 'cr',     6000, 'hss', 1800),  # TUBO 22.2 CAL 2.0 (manubrios)
+    ('round',  '25.4',   1.5, 'cr',     6000, 'tct', 2000),  # TUBO 25.4 CAL 1.5
+    ('round',  '15.88',  2.0, 'hr_est', 6000, 'hss', 2200),  # TUBO 15.88 HR EST CAL 2.0
+    ('square', '20x40',  1.6, 'cr',     6000, 'tct', 1600),  # TUBO RECTANGULAR 20x40 EC SPFC 390
+    ('round',  '6.35',   1.0, 'cr',     6000, 'hss', 2400),  # BARRA CALIBRADA 1016
 ]
 T = {}
-for sh, od, th, mat, lg in tubes_data:
+for sh, od, th, mat, lg, sw, rpm in tubes_data:
     t, _ = TubeSpec.objects.get_or_create(
         outer_diameter=od, thickness=th, material=mat, original_length=lg,
-        defaults={'shape': sh},
+        defaults={'shape': sh, 'saw_type': sw, 'rpm': rpm},
     )
     T[f'{od}x{th}'] = t
 
@@ -123,10 +124,11 @@ prods_data = [
 ]
 P = {}
 for nm, item, tk, cl, ch, mo, cu, cli, pr, sw, rpm in prods_data:
+    # sw y rpm ya no se guardan en el producto: viven en el tubo largo (T[tk]).
     obj, _ = ProductType.objects.get_or_create(name=nm, defaults={
         'tube_spec': T[tk], 'item_code': item, 'cut_length': cl,
         'requires_chaflan': ch, 'requires_moleteo': mo, 'requires_curvado': cu,
-        'client': cli, 'default_priority': pr, 'saw_type': sw, 'rpm': rpm,
+        'client': cli, 'default_priority': pr,
     })
     P[nm] = obj
 

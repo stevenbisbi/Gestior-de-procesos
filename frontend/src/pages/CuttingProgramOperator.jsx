@@ -186,10 +186,11 @@ export default function CuttingProgramOperator() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide border-b border-slate-100">
               <tr>
-                <th className="py-3 px-3 text-left whitespace-nowrap">Fechas</th>
+                <th className="py-3 px-3 text-left whitespace-nowrap">Item</th>
                 <th className="py-3 px-3 text-left">Producto / Tubo</th>
                 <th className="py-3 px-3 text-center whitespace-nowrap">Cantidades</th>
                 <th className="py-3 px-3 text-center whitespace-nowrap">Tubo largo</th>
+                <th className="py-3 px-3 text-left whitespace-nowrap">Fechas</th>
                 <th className="py-3 px-3 text-left whitespace-nowrap">Sierra</th>
                 <th className="py-3 px-3 text-center whitespace-nowrap">Avance</th>
                 <th className="py-3 px-3 text-left whitespace-nowrap">Cliente</th>
@@ -204,25 +205,21 @@ export default function CuttingProgramOperator() {
                 return (
                   <tr key={line.id}
                     className={`border-t border-slate-100 transition-colors ${isToday ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}>
-                    {/* Fechas */}
-                    <td className="py-3 px-3 whitespace-nowrap">
-                      <div className={`text-xs font-medium ${isToday ? 'text-blue-700' : 'text-slate-600'}`}>
-                        {formatDate(line.start_date)}
+                  {/* Item */}
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-slate-800">{line.item_code}</span>
+                        
                       </div>
-                      <div className="text-xs text-slate-400">→ {formatDate(line.end_date)}</div>
-                      {isToday && <div className="text-[10px] text-blue-500 font-bold mt-0.5">● HOY</div>}
-                    </td>
+                      
+                    </td>  
                     {/* Producto */}
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-slate-800">{line.product_type_data?.name}</span>
-                        {line.item_code && (
-                          <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-                            {line.item_code}
-                          </span>
-                        )}
+                        
                       </div>
-                      <div className="text-xs text-slate-400 mt-0.5 max-w-[260px] truncate">{line.tube_description}</div>
+                      
                     </td>
                     {/* Cantidades */}
                     <td className="py-3 px-3 text-center">
@@ -238,6 +235,14 @@ export default function CuttingProgramOperator() {
                       {line.tube_count != null && <div className="text-[10px] text-slate-400">tubos</div>}
                       {line.sections_per_tube && <div className="text-slate-500 mt-1">{line.sections_per_tube} tramos c/u</div>}
                       {line.tube_length_mm && <div className="text-slate-500">{line.tube_length_mm} mm</div>}
+                    </td>
+                    {/* Fechas */}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <div className={`text-xs font-medium ${isToday ? 'text-blue-700' : 'text-slate-600'}`}>
+                        {formatDate(line.start_date)}
+                      </div>
+                      <div className="text-xs text-slate-400">→ {formatDate(line.end_date)}</div>
+                      {isToday && <div className="text-[10px] text-blue-500 font-bold mt-0.5">● HOY</div>}
                     </td>
                     {/* Sierra */}
                     <td className="py-3 px-3">

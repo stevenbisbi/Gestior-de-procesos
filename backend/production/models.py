@@ -10,6 +10,7 @@ from django.utils import timezone
 class TubeSpec(models.Model):
     SHAPE_CHOICES = [('round', 'Redondo'), ('square', 'Cuadrado')]
     MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST')]
+    SAW_CHOICES = [('hss','HSS'),('tct','TCT'),('none','Ninguno')]
 
     shape           = models.CharField(max_length=10, choices=SHAPE_CHOICES)
     # CharField — admite valores fraccionados como "1/2", "5/8" o decimales "22.2"
@@ -17,6 +18,9 @@ class TubeSpec(models.Model):
     thickness       = models.FloatField(verbose_name='Espesor (mm)')
     material        = models.CharField(max_length=10, choices=MATERIAL_CHOICES)
     original_length = models.FloatField(default=6000, verbose_name='Longitud original (mm)')
+    # Parámetros de corte (los hereda el producto desde el tubo largo)
+    saw_type        = models.CharField(max_length=4, choices=SAW_CHOICES, default='none', verbose_name='Tipo de sierra')
+    rpm             = models.IntegerField(null=True, blank=True, verbose_name='RPM')
     created_at      = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -39,13 +43,20 @@ class ProductType(models.Model):
     requires_chaflan  = models.BooleanField(default=False)
     requires_moleteo  = models.BooleanField(default=False)
     requires_curvado  = models.BooleanField(default=False)
-    saw_type          = models.CharField(max_length=4, choices=[('hss','HSS'),('tct','TCT'),('none','Ninguno')], default='none')
-    rpm               = models.IntegerField(null=True, blank=True)
     notes             = models.TextField(blank=True)
     created_at        = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f'{self.name} — {self.tube_spec} @{self.cut_length:.0f}mm'
+
+    # ── saw_type y rpm se heredan del tubo largo (TubeSpec) ──
+    @property
+    def saw_type(self):
+        return self.tube_spec.saw_type if self.tube_spec_id else 'none'
+
+    @property
+    def rpm(self):
+        return self.tube_spec.rpm if self.tube_spec_id else None
 
     def get_process_route(self):
         route = ['corte']
@@ -53,6 +64,18 @@ class ProductType(models.Model):
         if self.requires_moleteo: route.append('moleteo')
         if self.requires_curvado: route.append('curvado')
         return route
+
+    @property
+    def final_process(self):
+        return self.get_process_route()[-1]
+
+    @property
+    def packing_unit_type(self):
+        """Solo corte (estiba) y curvado (caja / medio de manejo) generan medios."""
+        fp = self.final_process
+        if fp == 'corte':   return 'estiba'
+        if fp == 'curvado': return 'caja'
+        return None
 
 
 class Machine(models.Model):
@@ -191,6 +214,80 @@ class ProductionBatch(models.Model):
                 delivered_by=delivered_by or '', notes=notes or '',
                 received_by=user, batch=self,
             )
+
+    # ── Medios de manejo / despacho ─────────────────────────
+    @property
+    def packing_unit_type(self):
+        return self.product_type.packing_unit_type
+
+    @property
+    def packed_pending(self):
+        """Medios listos sin despachar."""
+        return self.packing_units.filter(is_dispatched=False).count()
+
+    @property
+    def packed_dispatched(self):
+        return self.packing_units.filter(is_dispatched=True).count()
+
+    @property
+    def tube_stock(self):
+        """Tubos largos disponibles del tipo de tubo de este producto (todas las recepciones)."""
+        from django.db.models import Sum
+        if not self.product_type.tube_spec_id:
+            return 0
+        agg = TubeReception.objects.filter(
+            tube_spec_id=self.product_type.tube_spec_id
+        ).aggregate(t=Sum('quantity'))
+        return agg['t'] or 0
+
+    def add_packing_units(self, user, quantities):
+        """Crea un PackingUnit por cada cantidad en la lista (estiba o caja según el producto)."""
+        utype = self.packing_unit_type
+        if not utype:
+            return []
+        created = []
+        for q in quantities:
+            q = int(q or 0)
+            if q <= 0:
+                continue
+            created.append(PackingUnit.objects.create(
+                batch=self, unit_type=utype, quantity=q, created_by=user,
+            ))
+        return created
+
+    def dispatch_units(self, unit_ids=None, dispatch_all=False):
+        """
+        Despacha medios de manejo específicos (unit_ids) o todos los pendientes.
+        Si tras el despacho no quedan medios pendientes y todos los procesos
+        están terminados → el lote pasa a 'dispatched'.
+        Para productos sin medios (final chaflan/moleteo) → despacha todo el lote.
+        """
+        from django.core.exceptions import ValidationError
+        if self.status not in ('finished', 'dispatched'):
+            raise ValidationError('El lote debe estar terminado para despachar.')
+
+        has_units = self.packing_units.exists()
+        if not has_units:
+            # Producto sin medios de manejo → despacho total como antes
+            self.status = 'dispatched'
+            self.dispatched_at = timezone.now()
+            self.save(update_fields=['status', 'dispatched_at', 'updated_at'])
+            return 0
+
+        qs = self.packing_units.filter(is_dispatched=False)
+        if not dispatch_all:
+            if not unit_ids:
+                raise ValidationError('Selecciona al menos un medio de manejo.')
+            qs = qs.filter(id__in=unit_ids)
+
+        count = qs.update(is_dispatched=True, dispatched_at=timezone.now())
+
+        # ¿Quedan medios pendientes?
+        if not self.packing_units.filter(is_dispatched=False).exists():
+            self.status = 'dispatched'
+            self.dispatched_at = timezone.now()
+            self.save(update_fields=['status', 'dispatched_at', 'updated_at'])
+        return count
 
     @property
     def progress_pct(self):
@@ -341,7 +438,7 @@ class ProcessRecord(models.Model):
         ('paused',     'Pausado (turno cerrado)'),
         ('finished',   'Terminado'),
     ]
-    SHIFT_CHOICES = [('A','Turno A (06:00–14:00)'),('B','Turno B (14:00–22:00)'),('C','Turno C (22:00–06:00)')]
+    SHIFT_CHOICES = [('A','Turno 1 (06:00–14:00)'),('B','Turno 2 (06:00–14:00)'),('C','Turno 3 (14:00–22:00)'),('D','Turno 5 (22:00–06:00)')]
 
     batch        = models.ForeignKey(ProductionBatch, on_delete=models.CASCADE, related_name='records')
     process_type = models.CharField(max_length=10)
@@ -556,3 +653,27 @@ class ReworkEntry(models.Model):
 
     def __str__(self):
         return f'{self.process_record} | rework {self.qty_reworked} / scrap {self.qty_scrapped}'
+
+
+class PackingUnit(models.Model):
+    """
+    Medio de manejo terminado y listo para despacho.
+    - estiba: lo genera el proceso de corte
+    - caja:   lo genera el proceso de curvado (medio de manejo metálico)
+    El operario los reporta uno por uno al cerrar turno del proceso final.
+    """
+    UNIT_TYPES = [('estiba', 'Estiba'), ('caja', 'Caja / medio de manejo')]
+
+    batch         = models.ForeignKey(ProductionBatch, on_delete=models.CASCADE, related_name='packing_units')
+    unit_type     = models.CharField(max_length=10, choices=UNIT_TYPES)
+    quantity      = models.IntegerField(verbose_name='Piezas en el medio')
+    created_by    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='packing_units')
+    created_at    = models.DateTimeField(auto_now_add=True)
+    is_dispatched = models.BooleanField(default=False)
+    dispatched_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['batch', 'created_at']
+
+    def __str__(self):
+        return f'{self.batch.batch_code} | {self.get_unit_type_display()} ({self.quantity})'

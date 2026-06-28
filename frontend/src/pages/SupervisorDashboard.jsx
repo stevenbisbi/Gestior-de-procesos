@@ -108,7 +108,6 @@ export default function SupervisorDashboard() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-600 text-[11px] uppercase tracking-wider">
                 <tr>
-                  <th className="px-4 py-2.5 text-left font-semibold">Lote</th>
                   <th className="px-4 py-2.5 text-left font-semibold">Producto</th>
                   <th className="px-4 py-2.5 text-left font-semibold">Cant.</th>
                   <th className="px-4 py-2.5 text-left font-semibold">Prioridad</th>
@@ -155,7 +154,6 @@ function BatchRow({ b }) {
 
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50">
-      <td className="px-4 py-3 font-mono text-xs">{b.batch_code}</td>
       <td className="px-4 py-3">
         <div className="font-semibold text-sm text-slate-800">{b.product_name}</div>
         <div className="text-[11px] text-slate-400">{b.tube_label} · {b.cut_length?.toFixed(0)} mm</div>

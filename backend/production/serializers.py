@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception, ReworkEntry
+from .models import TubeSpec, ProductType, Machine, ProductionBatch, ProcessRecord, ProcessShiftEntry, CuttingProgram, CuttingProgramLine, TubeReception, ReworkEntry, PackingUnit
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -16,6 +16,7 @@ class TubeSpecSerializer(serializers.ModelSerializer):
     label = serializers.SerializerMethodField()
     shape_display = serializers.CharField(source='get_shape_display', read_only=True)
     material_display = serializers.CharField(source='get_material_display', read_only=True)
+    saw_type_display = serializers.CharField(source='get_saw_type_display', read_only=True)
 
     class Meta:
         model = TubeSpec
@@ -37,6 +38,11 @@ class TubeReceptionSerializer(serializers.ModelSerializer):
 class ProductTypeSerializer(serializers.ModelSerializer):
     tube_spec_data = TubeSpecSerializer(source='tube_spec', read_only=True)
     process_route  = serializers.SerializerMethodField()
+    # saw_type / rpm ahora se heredan del tubo largo (propiedades del modelo)
+    saw_type       = serializers.CharField(read_only=True)
+    rpm            = serializers.IntegerField(read_only=True)
+    saw_type_display = serializers.CharField(source='tube_spec.get_saw_type_display', read_only=True)
+    packing_unit_type = serializers.CharField(read_only=True)
 
     class Meta:
         model = ProductType
@@ -76,6 +82,18 @@ class ReworkEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
 
+class PackingUnitSerializer(serializers.ModelSerializer):
+    unit_type_display = serializers.CharField(source='get_unit_type_display', read_only=True)
+    created_by_data   = UserMiniSerializer(source='created_by', read_only=True)
+
+    class Meta:
+        model  = PackingUnit
+        fields = ['id', 'batch', 'unit_type', 'unit_type_display', 'quantity',
+                  'created_by', 'created_by_data', 'created_at',
+                  'is_dispatched', 'dispatched_at']
+        read_only_fields = ['created_at', 'dispatched_at']
+
+
 class ProcessRecordSerializer(serializers.ModelSerializer):
     process_label  = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -88,6 +106,9 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
     shift_entries  = ProcessShiftEntrySerializer(many=True, read_only=True)
     rework_entries = ReworkEntrySerializer(many=True, read_only=True)
     active_shift_operator = serializers.SerializerMethodField()
+    # Medios de manejo: si este es el proceso final y qué tipo de medio genera
+    is_final_process  = serializers.SerializerMethodField()
+    packing_unit_type = serializers.SerializerMethodField()
     # Datos del lote para evitar fetchs extra en frontend
     batch_code             = serializers.CharField(source='batch.batch_code',     read_only=True)
     batch_priority         = serializers.CharField(source='batch.priority',        read_only=True)
@@ -102,7 +123,8 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
                   'qty_done','qty_remaining','qty_good','qty_defective','qty_scrapped',
                   'progress_pct','started_at','finished_at',
                   'notes','signature','has_quality_check',
-                  'shift_entries','rework_entries','active_shift_operator']
+                  'shift_entries','rework_entries','active_shift_operator',
+                  'is_final_process','packing_unit_type']
         read_only_fields = ['signature']
 
     def get_process_label(self, obj):
@@ -117,10 +139,22 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
             return UserMiniSerializer(active.operator).data
         return None
 
+    def get_is_final_process(self, obj):
+        return obj.process_type == obj.batch.product_type.final_process
+
+    def get_packing_unit_type(self, obj):
+        if obj.process_type == obj.batch.product_type.final_process:
+            return obj.batch.product_type.packing_unit_type
+        return None
+
 
 class ProductionBatchSerializer(serializers.ModelSerializer):
     product_type_data = ProductTypeSerializer(source='product_type', read_only=True)
     records           = ProcessRecordSerializer(many=True, read_only=True)
+    packing_units     = PackingUnitSerializer(many=True, read_only=True)
+    packing_unit_type = serializers.CharField(read_only=True)
+    packed_pending    = serializers.IntegerField(read_only=True)
+    packed_dispatched = serializers.IntegerField(read_only=True)
     progress_pct      = serializers.IntegerField(read_only=True)
     status_display    = serializers.CharField(source='get_status_display', read_only=True)
     priority_display  = serializers.CharField(source='get_priority_display', read_only=True)
@@ -131,6 +165,7 @@ class ProductionBatchSerializer(serializers.ModelSerializer):
         fields = ['id','batch_code','product_type','product_type_data','total_quantity',
                   'priority','priority_display','scheduled_date','status','status_display',
                   'notes','progress_pct','records','created_by','created_by_data',
+                  'packing_units','packing_unit_type','packed_pending','packed_dispatched',
                   'created_at','updated_at','dispatched_at']
         read_only_fields = ['batch_code','status','dispatched_at']
 
@@ -138,6 +173,7 @@ class ProductionBatchSerializer(serializers.ModelSerializer):
 class BatchListSerializer(serializers.ModelSerializer):
     """Versión liviana sin records anidados — para listas largas."""
     product_name      = serializers.CharField(source='product_type.name', read_only=True)
+    item_code         = serializers.CharField(source='product_type.item_code', read_only=True)
     tube_label        = serializers.CharField(source='product_type.tube_spec', read_only=True)
     cut_length        = serializers.FloatField(source='product_type.cut_length', read_only=True)
     progress_pct      = serializers.IntegerField(read_only=True)
@@ -145,13 +181,18 @@ class BatchListSerializer(serializers.ModelSerializer):
     priority_display  = serializers.CharField(source='get_priority_display', read_only=True)
     current_process   = serializers.SerializerMethodField()
     process_route     = serializers.SerializerMethodField()
+    tube_stock        = serializers.IntegerField(read_only=True)
+    packing_unit_type = serializers.CharField(read_only=True)
+    packed_pending    = serializers.IntegerField(read_only=True)
+    packed_dispatched = serializers.IntegerField(read_only=True)
 
     class Meta:
         model  = ProductionBatch
-        fields = ['id','batch_code','product_name','tube_label','cut_length',
+        fields = ['id','batch_code','product_name','item_code','tube_label','cut_length',
                   'total_quantity','priority','priority_display','scheduled_date',
                   'status','status_display','progress_pct','current_process',
-                  'process_route','created_at']
+                  'process_route','tube_stock','packing_unit_type',
+                  'packed_pending','packed_dispatched','created_at']
 
     def get_current_process(self, obj):
         rec = obj.records.exclude(status='finished').order_by('sequence').first()

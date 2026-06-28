@@ -24,12 +24,28 @@ export default function BatchDetail() {
 
   const canDispatch = batch?.status === 'finished' && user.is_supervisor;
   const canEdit     = user.is_supervisor && batch?.status !== 'dispatched';
+  const [selectedUnits, setSelectedUnits] = useState([]);
 
-  const handleDispatch = async () => {
-    if (!confirm('¿Confirmar despacho a almacén? El lote saldrá del seguimiento activo.')) return;
+  const pendingUnits = (batch?.packing_units || []).filter(u => !u.is_dispatched);
+  const usesPacking  = (batch?.packing_units || []).length > 0;
+
+  const toggleUnit = (uid) => setSelectedUnits(s =>
+    s.includes(uid) ? s.filter(x => x !== uid) : [...s, uid]);
+
+  const handleDispatchAll = async () => {
+    if (!confirm('¿Despachar TODO lo que queda? El lote saldrá del seguimiento activo.')) return;
     try {
-      await Batches.dispatch(id);
+      await Batches.dispatch(id, { all: true });
       nav('/supervisor');
+    } catch (err) { setError(err.message); }
+  };
+
+  const handleDispatchSelected = async () => {
+    if (selectedUnits.length === 0) { setError('Selecciona al menos un medio.'); return; }
+    try {
+      await Batches.dispatch(id, { unit_ids: selectedUnits });
+      setSelectedUnits([]);
+      refresh();
     } catch (err) { setError(err.message); }
   };
 
@@ -113,8 +129,53 @@ export default function BatchDetail() {
       </div>
 
       {canDispatch && (
-        <div className="mt-6 pt-4 border-t border-slate-200">
-          <button onClick={handleDispatch} className="btn btn-success btn-full">📦 Despachar a almacén</button>
+        <div className="mt-6 pt-4 border-t border-slate-200 space-y-3">
+          {usesPacking ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-700">
+                  📦 Medios de manejo listos ({pendingUnits.length})
+                </span>
+                {batch.packed_dispatched > 0 && (
+                  <span className="text-xs text-slate-400">{batch.packed_dispatched} ya despachados</span>
+                )}
+              </div>
+
+              {pendingUnits.length === 0 ? (
+                <p className="text-sm text-slate-400">Todo despachado.</p>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    {pendingUnits.map((u, i) => (
+                      <label key={u.id}
+                        className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 cursor-pointer hover:border-blue-300">
+                        <input type="checkbox" checked={selectedUnits.includes(u.id)}
+                          onChange={() => toggleUnit(u.id)} />
+                        <span className="text-sm font-medium text-slate-700 flex-1">
+                          {u.unit_type_display} {i + 1}
+                        </span>
+                        <span className="font-mono text-sm text-slate-600">{u.quantity} pzs</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleDispatchSelected}
+                      disabled={selectedUnits.length === 0}
+                      className="btn btn-primary flex-1">
+                      Despachar seleccionados ({selectedUnits.length})
+                    </button>
+                    <button onClick={handleDispatchAll} className="btn btn-success flex-1">
+                      Despachar todo
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <button onClick={handleDispatchAll} className="btn btn-success btn-full">
+              📦 Despachar a almacén
+            </button>
+          )}
         </div>
       )}
 

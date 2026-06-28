@@ -302,10 +302,9 @@ function StandaloneReceiveModal({ user, onClose, onReceived }) {
 
 // ── Fila de lote (waiting o ready) ──────────────────────────────────────────
 function BatchRow({ batch, mode, onReceive }) {
-  const tube = batch.tube_label || batch.product_type_data?.tube_spec_data?.label;
   const productName = batch.product_name || batch.product_type_data?.name;
-  const cutLength   = batch.cut_length   || batch.product_type_data?.cut_length;
   const isWaiting   = mode === 'waiting';
+  const stock       = batch.tube_stock ?? 0;
 
   return (
     <div className={`bg-white rounded-xl border-l-4 border border-slate-100 shadow-sm p-3.5 flex items-center gap-3
@@ -319,17 +318,17 @@ function BatchRow({ batch, mode, onReceive }) {
             className="font-mono text-sm font-semibold text-blue-600 hover:underline">
             {batch.batch_code}
           </Link>
+          {batch.item_code && (
+            <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{batch.item_code}</span>
+          )}
           <PriorityTag priority={batch.priority} />
         </div>
         <div className="font-semibold text-slate-800 truncate">{productName}</div>
-        <div className="text-xs text-slate-500 truncate">
-          {tube} · corte <strong>{cutLength?.toFixed?.(0) ?? cutLength}</strong> mm
-          {' · '}
-          <strong>{batch.total_quantity?.toLocaleString()}</strong> uds
+        {/* Solo tubos largos disponibles de esta referencia */}
+        <div className="text-sm mt-0.5">
+          <span className="text-slate-400">🪵 Tubos largos en canasta: </span>
+          <strong className={stock > 0 ? 'text-green-700' : 'text-slate-400'}>{stock.toLocaleString()}</strong>
         </div>
-        {batch.scheduled_date && (
-          <div className="text-[11px] text-slate-400 mt-0.5">📅 Programado: {formatDate(batch.scheduled_date)}</div>
-        )}
       </div>
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
         {isWaiting ? (
