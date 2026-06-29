@@ -86,9 +86,14 @@ export default function Canasta() {
                     )}
                   </div>
                   <div className="font-semibold text-slate-800 truncate">{b.product_name}</div>
-                  <div className="text-xs text-slate-500">
-                    🪵 <strong className="text-green-700">{(b.tube_stock ?? 0).toLocaleString()}</strong> tubos largos recibidos
-                  </div>
+                </div>
+                {/* Tubos largos recibidos — destacado */}
+                <div className="flex flex-col items-center px-3 flex-shrink-0">
+                  <span className="text-2xl">🪵</span>
+                  <span className="font-mono text-xl font-bold text-green-700 leading-none">
+                    {(b.tube_stock ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wide text-slate-400">tubos largos</span>
                 </div>
                 <Link to={`/lote/${b.id}`} className="btn btn-outline btn-sm flex-shrink-0">Ver lote</Link>
               </div>
