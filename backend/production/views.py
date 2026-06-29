@@ -120,6 +120,29 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
         if batch.total_quantity != old_qty:
             batch.sync_records_qty()
 
+    @action(detail=True, methods=['post'], url_path='adjust-tubes')
+    def adjust_tubes(self, request, pk=None):
+        """Corrige la cantidad de tubos largos recibidos del lote (crea un ajuste con la diferencia)."""
+        batch = self.get_object()
+        try:
+            target = int(request.data.get('quantity'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'Cantidad inválida.'}, status=400)
+        if target < 0:
+            return Response({'detail': 'La cantidad no puede ser negativa.'}, status=400)
+
+        current = batch.tube_stock
+        delta = target - current
+        if delta != 0:
+            tube_spec = batch.product_type.tube_spec
+            TubeReception.objects.create(
+                tube_spec=tube_spec, quantity=delta,
+                delivered_by='Ajuste de conteo',
+                notes=f'Ajuste manual: {current} → {target}',
+                received_by=request.user, batch=batch,
+            )
+        return Response(ProductionBatchSerializer(batch).data)
+
     @action(detail=True, methods=['post'], url_path='receive')
     def receive_material(self, request, pk=None):
         """Cortador confirma recepción del material. Lote pasa de waiting_material → in_basket."""

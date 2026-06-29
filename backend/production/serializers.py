@@ -155,6 +155,7 @@ class ProductionBatchSerializer(serializers.ModelSerializer):
     packing_unit_type = serializers.CharField(read_only=True)
     packed_pending    = serializers.IntegerField(read_only=True)
     packed_dispatched = serializers.IntegerField(read_only=True)
+    tube_stock        = serializers.IntegerField(read_only=True)
     progress_pct      = serializers.IntegerField(read_only=True)
     status_display    = serializers.CharField(source='get_status_display', read_only=True)
     priority_display  = serializers.CharField(source='get_priority_display', read_only=True)
@@ -166,7 +167,7 @@ class ProductionBatchSerializer(serializers.ModelSerializer):
                   'priority','priority_display','scheduled_date','status','status_display',
                   'notes','progress_pct','records','created_by','created_by_data',
                   'packing_units','packing_unit_type','packed_pending','packed_dispatched',
-                  'created_at','updated_at','dispatched_at']
+                  'tube_stock','created_at','updated_at','dispatched_at']
         read_only_fields = ['batch_code','status','dispatched_at']
 
 

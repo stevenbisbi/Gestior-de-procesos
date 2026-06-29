@@ -119,6 +119,30 @@ export default function BatchDetail() {
         </div>
       </div>
 
+      {/* Características completas del tubo */}
+      {tube && (
+        <div className="card mb-3">
+          <div className="card-header">
+            <span className="card-title">
+              {tube.shape === 'square' ? '🟦' : '🔵'} Características del tubo
+            </span>
+            <span className="text-xs text-slate-400">🪵 {(batch.tube_stock ?? 0).toLocaleString()} tubos largos recibidos</span>
+          </div>
+          <div className="card-body">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-5 text-sm">
+              <SpecRow label="Forma"            value={tube.shape_display} />
+              <SpecRow label="Diámetro / lado"  value={`${tube.outer_diameter} mm`} mono />
+              <SpecRow label="Espesor"          value={`${tube.thickness} mm`} mono />
+              <SpecRow label="Material"         value={tube.material_display} />
+              <SpecRow label="Longitud original" value={`${tube.original_length?.toFixed?.(0) ?? tube.original_length} mm`} mono />
+              <SpecRow label="Long. de corte"   value={`${batch.product_type_data?.cut_length?.toFixed?.(0)} mm`} mono />
+              <SpecRow label="Tipo de sierra"   value={tube.saw_type_display} />
+              <SpecRow label="RPM"              value={tube.rpm ?? '—'} mono />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Flujo de procesos</div>
       <div className="flex flex-col gap-2">
         {route.map(rec => (
@@ -383,6 +407,16 @@ function ProcessRecordCard({ rec, batch, canStart, canFinish, onChange }) {
           </div>
         </details>
       )}
+    </div>
+  );
+}
+
+// ── Fila de característica del tubo ──────────────────────────────────────────
+function SpecRow({ label, value, mono }) {
+  return (
+    <div>
+      <div className="text-[11px] font-bold uppercase text-slate-400 tracking-wider">{label}</div>
+      <div className={`font-medium ${mono ? 'font-mono' : ''}`}>{value || '—'}</div>
     </div>
   );
 }

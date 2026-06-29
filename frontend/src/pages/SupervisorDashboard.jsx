@@ -77,7 +77,6 @@ export default function SupervisorDashboard() {
         <Link to="/defectuosos" className="stat-card hover:bg-red-50/40 hover:border-red-200 transition cursor-pointer">
           <div className="stat-num text-red-600">{stats.with_defects || 0}</div>
           <div className="stat-label">Con defectos</div>
-          <div className="stat-sub">{(stats.defective_qty || 0).toLocaleString()} pzs en rework →</div>
         </Link>
         <div className="stat-card">
           <div className="stat-num">{stats.total}</div>

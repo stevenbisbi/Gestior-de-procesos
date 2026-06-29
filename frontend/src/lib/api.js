@@ -50,8 +50,9 @@ export const Batches = {
   get:     (id)          => api.get(`/batches/${id}/`),
   create:  (data)        => api.post('/batches/', data),
   update:  (id, data)    => api.patch(`/batches/${id}/`, data),
-  receive: (id, data)    => api.post(`/batches/${id}/receive/`, data || {}),
-  dispatch:(id, data)    => api.post(`/batches/${id}/dispatch/`, data || {}),
+  receive:    (id, data) => api.post(`/batches/${id}/receive/`, data || {}),
+  adjustTubes:(id, data) => api.post(`/batches/${id}/adjust-tubes/`, data || {}),
+  dispatch:   (id, data) => api.post(`/batches/${id}/dispatch/`, data || {}),
 };
 
 export const Records = {

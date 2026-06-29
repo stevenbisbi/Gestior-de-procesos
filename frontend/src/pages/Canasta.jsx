@@ -14,6 +14,7 @@ export default function Canasta() {
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState('');
   const [showReceive, setShowReceive] = useState(false);
+  const [editTubes, setEditTubes]     = useState(null);  // lote a editar tubos largos
 
   const refresh = async () => {
     setLoading(true);
@@ -87,14 +88,16 @@ export default function Canasta() {
                   </div>
                   <div className="font-semibold text-slate-800 truncate">{b.product_name}</div>
                 </div>
-                {/* Tubos largos recibidos — destacado */}
-                <div className="flex flex-col items-center px-3 flex-shrink-0">
+                {/* Tubos largos recibidos — destacado + editable */}
+                <button type="button" onClick={() => setEditTubes(b)}
+                  className="flex flex-col items-center px-3 flex-shrink-0 rounded-lg hover:bg-slate-50 transition"
+                  title="Editar cantidad de tubos largos">
                   <span className="text-2xl">🪵</span>
                   <span className="font-mono text-xl font-bold text-green-700 leading-none">
                     {(b.tube_stock ?? 0).toLocaleString()}
                   </span>
-                  <span className="text-[10px] uppercase tracking-wide text-slate-400">tubos largos</span>
-                </div>
+                  <span className="text-[10px] uppercase tracking-wide text-slate-400">tubos largos ✏️</span>
+                </button>
                 <Link to={`/lote/${b.id}`} className="btn btn-outline btn-sm flex-shrink-0">Ver lote</Link>
               </div>
             ))}
@@ -158,7 +161,69 @@ export default function Canasta() {
           onCreated={() => { setShowReceive(false); refresh(); }}
         />
       )}
+      {editTubes && (
+        <EditTubesModal
+          batch={editTubes}
+          onClose={() => setEditTubes(null)}
+          onSaved={() => { setEditTubes(null); refresh(); }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Modal para corregir la cantidad de tubos largos de un lote ───────────────
+function EditTubesModal({ batch, onClose, onSaved }) {
+  const [qty, setQty]     = useState(String(batch.tube_stock ?? 0));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr]     = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true); setErr('');
+    try {
+      await Batches.adjustTubes(batch.id, { quantity: Number(qty) });
+      onSaved();
+    } catch (ex) { setErr(ex.message); }
+    finally      { setSaving(false); }
+  };
+
+  const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400';
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <form onSubmit={submit}>
+          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">Editar tubos largos</p>
+              <h2 className="text-base font-bold text-slate-800">{batch.batch_code}</h2>
+            </div>
+            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                Cantidad de tubos largos recibidos
+              </span>
+              <input type="number" min="0" required className={inp}
+                value={qty} onChange={e => setQty(e.target.value)} autoFocus />
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                Se registra un ajuste con la diferencia respecto a {batch.tube_stock ?? 0}.
+              </span>
+            </label>
+          </div>
+          <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-2xl">
+            <button type="button" onClick={onClose} className="btn btn-outline px-4">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn btn-primary px-5">
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
   );
 }
 

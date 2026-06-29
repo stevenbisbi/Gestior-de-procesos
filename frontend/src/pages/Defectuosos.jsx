@@ -52,7 +52,7 @@ export default function Defectuosos() {
         <p className="text-xs text-white/60 font-medium uppercase tracking-wide">Control de calidad · Material a revisar</p>
         <h1 className="text-2xl font-bold mt-0.5">🔧 Tubería defectuosa</h1>
         <p className="text-sm text-white/60 mt-0.5">
-          <strong className="text-red-300">{totalDefective.toLocaleString()}</strong> piezas en rework ·{' '}
+          <strong className="text-red-300">{totalDefective.toLocaleString()}</strong> piezas en reporceso·{' '}
           <strong className="text-gray-300">{totalScrapped.toLocaleString()}</strong> descartadas (acumulado)
         </p>
       </div>
