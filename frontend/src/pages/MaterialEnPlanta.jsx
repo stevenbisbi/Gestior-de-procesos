@@ -1,49 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Batches, Catalog } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Loading } from '../components/Common';
 import { NewBatchModal } from './BatchList';
 import { CreateProductModal } from '../components/ProductPicker';
-import Canasta from './Canasta';
-import Defectuosos from './Defectuosos';
-
-const TABS = [
-  { key: 'todo',        label: 'Todo',        icon: '📦' },
-  { key: 'canasta',     label: 'Canasta',     icon: '🧺' },
-  { key: 'defectuosos', label: 'Defectuosos', icon: '🔧' },
-];
 
 export default function MaterialEnPlanta() {
-  const [params, setParams] = useSearchParams();
-  const tab = TABS.some(t => t.key === params.get('tab')) ? params.get('tab') : 'todo';
-  const setTab = (k) => setParams(k === 'todo' ? {} : { tab: k });
-
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-slate-800">🏗️ Material en planta</h1>
-
-      {/* Tabs internas */}
-      <div className="flex gap-1 border-b border-slate-200">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition whitespace-nowrap
-              ${tab === t.key
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-            <span className="mr-1.5">{t.icon}</span>{t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'todo'        && <TodoTab />}
-      {tab === 'canasta'     && <Canasta />}
-      {tab === 'defectuosos' && <Defectuosos />}
+      <h1 className="text-xl font-bold text-slate-800">📦 Material en planta</h1>
+      <TodoTab />
     </div>
   );
 }
 
-// ── Pestaña "Todo": tabla de todos los lotes en planta ──────────────────────
+// ── Tabla de todos los lotes en planta ──────────────────────────────────────
 const STATUSES = [
   { v: '',                 label: 'Todos' },
   { v: 'waiting_material', label: 'Esperando material' },

@@ -59,11 +59,11 @@ export default function SupervisorDashboard() {
           <div className="stat-label">Esperando material</div>
           <div className="stat-sub">Sin recibir aún</div>
         </div>
-        <div className="stat-card">
+        <Link to="/canasta" className="stat-card hover:bg-blue-50/40 hover:border-blue-200 transition cursor-pointer">
           <div className="stat-num text-blue-600">{stats.in_basket}</div>
           <div className="stat-label">En canasta</div>
-          <div className="stat-sub">Listos para iniciar</div>
-        </div>
+          <div className="stat-sub">Ver canasta →</div>
+        </Link>
         <div className="stat-card">
           <div className="stat-num text-amber-600">{stats.in_process}</div>
           <div className="stat-label">En proceso</div>
@@ -74,10 +74,10 @@ export default function SupervisorDashboard() {
           <div className="stat-label">Terminados</div>
           <div className="stat-sub">Listos para despacho</div>
         </div>
-        <Link to="/supervisor?tab=defectuosos" className="stat-card hover:bg-red-50/40 hover:border-red-200 transition cursor-pointer">
+        <Link to="/defectuosos" className="stat-card hover:bg-red-50/40 hover:border-red-200 transition cursor-pointer">
           <div className="stat-num text-red-600">{stats.with_defects || 0}</div>
           <div className="stat-label">Con defectos</div>
-          <div className="stat-sub">{(stats.defective_qty || 0).toLocaleString()} pzs en rework</div>
+          <div className="stat-sub">{(stats.defective_qty || 0).toLocaleString()} pzs en rework →</div>
         </Link>
         <div className="stat-card">
           <div className="stat-num">{stats.total}</div>
