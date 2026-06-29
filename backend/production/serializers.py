@@ -175,6 +175,7 @@ class BatchListSerializer(serializers.ModelSerializer):
     product_name      = serializers.CharField(source='product_type.name', read_only=True)
     item_code         = serializers.CharField(source='product_type.item_code', read_only=True)
     tube_label        = serializers.CharField(source='product_type.tube_spec', read_only=True)
+    tube_shape        = serializers.CharField(source='product_type.tube_spec.shape', read_only=True)
     cut_length        = serializers.FloatField(source='product_type.cut_length', read_only=True)
     progress_pct      = serializers.IntegerField(read_only=True)
     status_display    = serializers.CharField(source='get_status_display', read_only=True)
@@ -188,7 +189,7 @@ class BatchListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = ProductionBatch
-        fields = ['id','batch_code','product_name','item_code','tube_label','cut_length',
+        fields = ['id','batch_code','product_name','item_code','tube_label','tube_shape','cut_length',
                   'total_quantity','priority','priority_display','scheduled_date',
                   'status','status_display','progress_pct','current_process',
                   'process_route','tube_stock','packing_unit_type',

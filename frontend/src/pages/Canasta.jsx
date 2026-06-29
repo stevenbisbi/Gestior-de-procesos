@@ -72,7 +72,10 @@ export default function Canasta() {
             {inBasket.map(b => (
               <div key={b.id}
                 className="bg-white rounded-xl border border-slate-100 shadow-sm border-l-4 border-l-green-500 p-3.5 flex items-center gap-3">
-                <div className="w-11 h-11 rounded-lg bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">🧺</div>
+                <div className="w-11 h-11 rounded-lg bg-slate-100 flex items-center justify-center text-xl flex-shrink-0"
+                  title={b.tube_shape === 'square' ? 'Cuadrado' : 'Redondo'}>
+                  {b.tube_shape === 'square' ? '🟦' : '🔵'}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Link to={`/lote/${b.id}`} className="font-mono text-sm font-semibold text-blue-600 hover:underline">
