@@ -391,17 +391,22 @@ function ProcessRecordCard({ rec, batch, canStart, canFinish, onChange }) {
           </summary>
           <div className="mt-2 space-y-1">
             {shifts.map(s => (
-              <div key={s.id} className="text-xs bg-white/70 rounded-lg px-2.5 py-1.5 flex items-center justify-between border border-slate-100">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-1.5 h-1.5 rounded-full ${s.finished_at ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}/>
-                  <span className="font-medium text-slate-700">{s.operator_data?.full_name || '—'}</span>
-                  {s.shift && <span className="font-mono text-slate-400">[{s.shift}]</span>}
-                  {s.machine_data && <span className="text-slate-400">· {s.machine_data.name}</span>}
+              <div key={s.id} className="text-xs bg-white/70 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full ${s.finished_at ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}/>
+                    <span className="font-medium text-slate-700">{s.operator_data?.full_name || '—'}</span>
+                    {s.shift && <span className="font-mono text-slate-400">[{s.shift}]</span>}
+                    {s.machine_data && <span className="text-slate-400">· {s.machine_data.name}</span>}
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="font-mono text-slate-700"><strong>{s.qty_done}</strong> uds</span>
+                    <span className="text-slate-400">{formatDateTime(s.finished_at || s.started_at)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="font-mono text-slate-700"><strong>{s.qty_done}</strong> uds</span>
-                  <span className="text-slate-400">{formatDateTime(s.finished_at || s.started_at)}</span>
-                </div>
+                {s.notes && (
+                  <div className="mt-1 text-slate-500 italic">📝 {s.notes}</div>
+                )}
               </div>
             ))}
           </div>

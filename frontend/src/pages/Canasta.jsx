@@ -148,6 +148,7 @@ export default function Canasta() {
                     <th className="text-left py-2.5 px-3">Lote</th>
                     <th className="text-left py-2.5 px-3">Almacén</th>
                     <th className="text-left py-2.5 px-3">Recibió</th>
+                    <th className="text-left py-2.5 px-3">Notas</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -172,6 +173,7 @@ export default function Canasta() {
                       </td>
                       <td className="py-2.5 px-3 text-xs text-slate-600">{r.delivered_by || '—'}</td>
                       <td className="py-2.5 px-3 text-xs text-slate-600">{r.received_by_data?.full_name || '—'}</td>
+                      <td className="py-2.5 px-3 text-xs text-slate-500 max-w-[200px]">{r.notes || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
