@@ -55,9 +55,11 @@ export default function OperatorDashboard() {
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <PriorityTag priority={rec.batch_priority} />
                     </div>
-                    <div className="font-semibold">{rec.process_label}
-                      {rec.product_name && <span className="text-sm text-slate-400 font-normal"> · {rec.product_name}</span>}
+                    <div className="text-sm">{rec.process_label}
                     </div>
+                      <div className="font-bold text-blue-600">{rec.product_item }</div>
+                      <div className="font-bold">{rec.product_name }</div>
+                    
                     <ProgressLine record={rec} />
                     {rec.started_at && (
                       <div className="text-xs text-amber-600 mt-1">
@@ -104,12 +106,12 @@ export default function OperatorDashboard() {
                     ${PRIORITY_RING[rec.batch_priority] || 'border-l-slate-300'}`}>
                   <ProcIcon type={rec.process_type} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <PriorityTag priority={rec.batch_priority} />
+                    
+                    <div className="text-sm">
+                      {rec.process_label}
                     </div>
-                    <div className="font-semibold">{rec.process_label}
-                      {rec.product_name && <span className="text-sm text-slate-400 font-normal"> · {rec.product_name}</span>}
-                    </div>
+                      <div className="font-bold text-blue-600">{rec.product_item }</div>
+                      <div className="font-bold">{rec.product_name}</div>
                     <ProgressLine record={rec} />
                     {isPaused && rec.operator_data && (
                       <div className="text-xs text-blue-600 mt-1">
