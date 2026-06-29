@@ -165,22 +165,49 @@ class ProductionBatch(models.Model):
 
     def sync_records_qty(self):
         """
-        Reaplica total_quantity como qty_assigned a todos los procesos y recalcula
-        sus estados según lo ya producido. Se llama cuando el supervisor corrige el conteo.
+        Reaplica las cantidades a toda la cadena: el primer proceso parte del
+        total del pedido y cada proceso siguiente recibe las piezas buenas del
+        anterior. Se llama cuando el supervisor corrige el conteo del lote.
         """
-        for rec in self.records.all():
-            rec.qty_assigned = self.total_quantity
-            if rec.active_shift:
-                rec.status = 'in_process'
-            elif rec.qty_done >= self.total_quantity and rec.qty_done > 0:
-                rec.status = 'finished'
-                if not rec.finished_at:
-                    rec.finished_at = timezone.now()
-            elif rec.qty_done > 0:
-                rec.status = 'paused'
-            else:
-                rec.status = 'pending'
+        route = self.product_type.get_process_route()
+        prev_good = None
+        for seq, proc in enumerate(route):
+            rec = self.records.filter(process_type=proc).first()
+            if not rec:
+                prev_good = None
+                continue
+            rec.qty_assigned = self.total_quantity if seq == 0 else (
+                prev_good if prev_good is not None else self.total_quantity)
+            rec._recompute_status()
             rec.save(update_fields=['qty_assigned', 'status', 'finished_at'])
+            prev_good = rec.qty_good
+        self._recalc_status()
+
+    def recalc_downstream_quantities(self, changed_process):
+        """
+        Propaga las piezas buenas de `changed_process` hacia adelante en la ruta:
+        cada proceso siguiente recibe como qty_assigned las piezas buenas del
+        anterior. Refleja la merma (descartes) y la recuperación (rework) en lo
+        que el resto de la cadena debe producir. No toca el proceso que cambió
+        (su estado lo fija quien lo llama: cierre de turno o rework).
+        """
+        route = self.product_type.get_process_route()
+        if changed_process not in route:
+            return
+        idx = route.index(changed_process)
+        prev = self.records.filter(process_type=changed_process).first()
+        if not prev:
+            return
+        prev_good = prev.qty_good
+        for proc in route[idx + 1:]:
+            rec = self.records.filter(process_type=proc).first()
+            if not rec:
+                break
+            if rec.qty_assigned != prev_good:
+                rec.qty_assigned = prev_good
+                rec._recompute_status()
+                rec.save(update_fields=['qty_assigned', 'status', 'finished_at'])
+            prev_good = rec.qty_good
         self._recalc_status()
 
     def _recalc_status(self):
@@ -508,8 +535,12 @@ class ProcessRecord(models.Model):
 
     @property
     def qty_good(self):
-        """Piezas conformes que pueden pasar al siguiente proceso."""
-        return max(0, self.qty_done - self.qty_defective)
+        """
+        Piezas conformes que pueden pasar al siguiente proceso.
+        = producidas − defectuosas pendientes − descartadas (merma definitiva).
+        Las recuperadas (rework) vuelven a contar; las descartadas no.
+        """
+        return max(0, self.qty_done - self.qty_defective - self.qty_scrapped)
 
     @property
     def qty_remaining(self):
@@ -533,6 +564,26 @@ class ProcessRecord(models.Model):
     def active_shift(self):
         """Turno actualmente en curso (sin finished_at), o None."""
         return self.shift_entries.filter(finished_at__isnull=True).first()
+
+    def _recompute_status(self):
+        """
+        Recalcula el estado a partir de qty_done vs qty_assigned (sin guardar).
+        Usado al re-propagar cantidades aguas abajo: si la merma reduce el
+        qty_assigned por debajo de lo ya hecho → finished; si una recuperación
+        lo sube por encima → vuelve a paused.
+        """
+        if self.active_shift:
+            self.status = 'in_process'
+        elif self.qty_done >= self.qty_assigned:
+            self.status = 'finished'
+            if not self.finished_at:
+                self.finished_at = timezone.now()
+        elif self.qty_done > 0:
+            self.status = 'paused'
+            self.finished_at = None
+        else:
+            self.status = 'pending'
+            self.finished_at = None
 
     # ── Operaciones ────────────────────────────────────────
     def start_shift(self, user, machine=None, shift=''):
@@ -607,10 +658,9 @@ class ProcessRecord(models.Model):
 
         self.save(update_fields=['qty_done','qty_defective','signature','status','finished_at'])
 
-        # Si el lote completó todos sus procesos → finished
-        if self.status == 'finished' and not self.batch.records.exclude(status='finished').exists():
-            self.batch.status = 'finished'
-            self.batch.save(update_fields=['status', 'updated_at'])
+        # Propagar las piezas buenas a los procesos siguientes (merma / recuperación)
+        # y recalcular el estado del lote.
+        self.batch.recalc_downstream_quantities(self.process_type)
 
         return active
 
@@ -643,6 +693,10 @@ class ProcessRecord(models.Model):
         # Las descartadas se contabilizan como scrap acumulado
         self.qty_scrapped += qty_scrapped
         self.save(update_fields=['qty_defective', 'qty_scrapped'])
+
+        # Recuperadas → vuelven al flujo (suman al siguiente proceso);
+        # descartadas → merma definitiva (restan). Re-propagar la cadena.
+        self.batch.recalc_downstream_quantities(self.process_type)
 
     # ── Compatibilidad con código existente ────────────────
     def start(self, user, machine=None, shift=''):

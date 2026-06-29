@@ -353,6 +353,25 @@ function ProcessRecordCard({ rec, batch, canStart, canFinish, onChange }) {
             {rec.machine_data && status !== 'pending' && ` · ${rec.machine_data.name}`}
           </div>
 
+          {/* Defectuosas / merma — evidencia de pérdida de piezas */}
+          {(rec.qty_defective > 0 || rec.qty_scrapped > 0) && status !== 'pending' && (
+            <div className="text-[11px] mt-1 flex flex-wrap gap-2">
+              {rec.qty_defective > 0 && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                  🔧 {rec.qty_defective} defectuosas pendientes
+                </span>
+              )}
+              {rec.qty_scrapped > 0 && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                  🗑 {rec.qty_scrapped} descartadas (merma)
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                ✓ {rec.qty_good} buenas al siguiente
+              </span>
+            </div>
+          )}
+
           {/* Barra de progreso si hay avance */}
           {(status === 'paused' || status === 'in_process' || status === 'finished') && (
             <div className="mt-1.5 h-1.5 bg-white/70 rounded-full overflow-hidden">
