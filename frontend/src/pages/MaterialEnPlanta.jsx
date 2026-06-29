@@ -112,14 +112,14 @@ function TodoTab() {
                         <th className="px-4 py-2.5 text-left font-semibold">Producto</th>
                         <th className="px-4 py-2.5 text-left font-semibold">Cant.</th>
                         <th className="px-4 py-2.5 text-left font-semibold">Prioridad</th>
-                        <th className="px-4 py-2.5 text-left font-semibold">Estado</th>
+                        {status === '' && <th className="px-4 py-2.5 text-left font-semibold">Estado</th>}
                         <th className="px-4 py-2.5 text-left font-semibold min-w-[200px]">Proceso actual</th>
                         <th className="px-4 py-2.5 text-left font-semibold min-w-[130px]">Avance total</th>
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {batches.map(b => <BatchRow key={b.id} b={b} />)}
+                      {batches.map(b => <BatchRow key={b.id} b={b} showEstado={status === ''} />)}
                     </tbody>
                   </table>
                 )}
@@ -155,7 +155,7 @@ function TodoTab() {
 }
 
 // ── Fila del lote (misma vista que tenía el Resumen) ────────────────────────
-function BatchRow({ b }) {
+function BatchRow({ b, showEstado = true }) {
   const cp = b.current_process;
   const statusBadgeCls = {
     waiting_material: 'badge-amber',
@@ -189,9 +189,11 @@ function BatchRow({ b }) {
       <td className="px-4 py-3">
         <span className={`priority-${b.priority} text-xs font-semibold`}>{b.priority_display}</span>
       </td>
-      <td className="px-4 py-3">
-        <span className={`badge ${statusBadgeCls} badge-dot`}>{b.status_display}</span>
-      </td>
+      {showEstado && (
+        <td className="px-4 py-3">
+          <span className={`badge ${statusBadgeCls} badge-dot`}>{b.status_display}</span>
+        </td>
+      )}
       <td className="px-4 py-3">
         {cp ? (
           <div>
