@@ -3,9 +3,15 @@ from django.contrib.auth.models import User
 
 
 class QualityCheck(models.Model):
-    process_record = models.OneToOneField(
+    # Una puesta a punto por TURNO (shift_entry). process_record queda como
+    # referencia para agrupar/reportar (varios QC por proceso, uno por turno).
+    process_record = models.ForeignKey(
         'production.ProcessRecord', on_delete=models.CASCADE,
-        related_name='quality_check'
+        related_name='quality_checks'
+    )
+    shift_entry = models.OneToOneField(
+        'production.ProcessShiftEntry', on_delete=models.CASCADE,
+        related_name='quality_check', null=True, blank=True,
     )
 
     # Datos generales

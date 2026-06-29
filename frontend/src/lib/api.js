@@ -79,6 +79,7 @@ export const Dashboard = {
 export const Quality = {
   list:    (params = {}) => api.get('/quality/checks/?' + new URLSearchParams(params)),
   byRecord:(rid)         => api.get(`/quality/checks/?record=${rid}`),
+  byShift: (seid)        => api.get(`/quality/checks/?shift_entry=${seid}`),
   get:     (id)          => api.get(`/quality/checks/${id}/`),
   create:  (data)        => api.post('/quality/checks/', data),
   update:  (id, data)    => api.put(`/quality/checks/${id}/`, data),

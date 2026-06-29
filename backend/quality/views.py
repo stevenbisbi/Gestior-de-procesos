@@ -3,14 +3,15 @@ from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
-from production.models import ProcessRecord
+from production.models import ProcessRecord, ProcessShiftEntry
 from .models import QualityCheck, DimensionalLog
 from .serializers import QualityCheckSerializer, DimensionalLogSerializer
 
 
 class QualityCheckViewSet(viewsets.ModelViewSet):
     queryset = QualityCheck.objects.select_related(
-        'process_record__batch__product_type', 'process_record__machine', 'created_by'
+        'process_record__batch__product_type', 'process_record__machine',
+        'shift_entry__operator', 'created_by'
     )
     serializer_class = QualityCheckSerializer
 
@@ -19,6 +20,9 @@ class QualityCheckViewSet(viewsets.ModelViewSet):
         record_pk = self.request.query_params.get('record')
         if record_pk:
             qs = qs.filter(process_record_id=record_pk)
+        shift_pk = self.request.query_params.get('shift_entry')
+        if shift_pk:
+            qs = qs.filter(shift_entry_id=shift_pk)
         only_nc = self.request.query_params.get('only_nc')
         if only_nc in ('1','true','yes'):
             qs = [q for q in qs if q.has_nonconformity]
@@ -33,12 +37,17 @@ class QualityCheckViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
-        record = get_object_or_404(ProcessRecord, pk=request.data.get('process_record'))
-        if hasattr(record, 'quality_check'):
-            return Response({'detail': 'Este proceso ya tiene un control de calidad.'}, status=400)
+        """Crea la puesta a punto del TURNO. Requiere shift_entry."""
+        se_id = request.data.get('shift_entry')
+        if not se_id:
+            return Response({'detail': 'Falta el turno (shift_entry).'}, status=400)
+        shift_entry = get_object_or_404(ProcessShiftEntry, pk=se_id)
+        if hasattr(shift_entry, 'quality_check'):
+            return Response({'detail': 'Este turno ya tiene control de calidad.'}, status=400)
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        ser.save(process_record=record, created_by=request.user)
+        ser.save(process_record=shift_entry.process_record,
+                 shift_entry=shift_entry, created_by=request.user)
         return Response(ser.data, status=201)
 
 

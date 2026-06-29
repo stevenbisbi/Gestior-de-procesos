@@ -10,11 +10,16 @@ class QualityCheckSerializer(serializers.ModelSerializer):
     product_name      = serializers.CharField(source='process_record.batch.product_type.name', read_only=True)
     process_label     = serializers.SerializerMethodField()
     process_type      = serializers.CharField(source='process_record.process_type', read_only=True)
+    operator_name     = serializers.SerializerMethodField()
 
     class Meta:
         model = QualityCheck
         fields = '__all__'
-        read_only_fields = ['process_record','created_by','created_at','updated_at']
+        read_only_fields = ['process_record','shift_entry','created_by','created_at','updated_at']
+
+    def get_operator_name(self, obj):
+        op = obj.shift_entry.operator if obj.shift_entry else obj.created_by
+        return (op.get_full_name() or op.username) if op else '—'
 
     def get_process_label(self, obj):
         return obj.process_record.get_process_label()

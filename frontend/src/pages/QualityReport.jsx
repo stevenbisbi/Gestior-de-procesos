@@ -38,7 +38,7 @@ export default function QualityReport() {
                 <div>
                   <div className="font-bold text-sm">{qc.product_name} — {qc.process_label}</div>
                   <div className="text-xs text-slate-600 mt-0.5">
-                    {formatDate(qc.date)} · {qc.created_by_data?.full_name || '—'}
+                    {formatDate(qc.date)} · {qc.operator_name || qc.created_by_data?.full_name || '—'}
                   </div>
                   <div className="text-xs text-red-700 mt-0.5 flex flex-wrap gap-2">
                     {qc.dimensions_ok === 'no' && <span>• Dimensiones NC</span>}
@@ -82,7 +82,7 @@ export default function QualityReport() {
                     <td className="px-3 py-2.5 text-xs">{formatDate(qc.date)}</td>
                     <td className="px-3 py-2.5 text-xs">{qc.product_name}</td>
                     <td className="px-3 py-2.5">{qc.process_label}</td>
-                    <td className="px-3 py-2.5 text-xs">{qc.created_by_data?.full_name || '—'}</td>
+                    <td className="px-3 py-2.5 text-xs">{qc.operator_name || qc.created_by_data?.full_name || '—'}</td>
                     <td className="px-3 py-2.5"><MiniBadge val={qc.dimensions_ok} /></td>
                     <td className="px-3 py-2.5"><MiniBadge val={qc.appearance_ok} /></td>
                     <td className="px-3 py-2.5"><MiniBadge val={qc.cut_appearance} /></td>

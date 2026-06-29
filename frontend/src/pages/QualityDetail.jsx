@@ -10,11 +10,14 @@ export default function QualityDetail() {
   const [record, setRecord] = useState(null);
 
   useEffect(() => {
-    Promise.all([Quality.byRecord(rid), Records.get(rid)])
-      .then(([list, r]) => {
-        setQc(list[0]);
-        setRecord(r);
-      });
+    Records.get(rid).then(r => {
+      setRecord(r);
+      // Puesta a punto del turno activo
+      const fetchQc = r.active_shift_id
+        ? Quality.byShift(r.active_shift_id)
+        : Quality.byRecord(rid);   // fallback: la más reciente del proceso
+      fetchQc.then(list => setQc(list[list.length - 1] || null));
+    });
   }, [rid]);
 
   if (!qc || !record) return <Loading />;
@@ -36,7 +39,7 @@ export default function QualityDetail() {
       <DetailSection icon="📋" title="Datos Generales" rows={[
         ['Fecha', formatDate(qc.date)],
         ['Turno', qc.shift],
-        ['Operario', qc.created_by_data?.full_name || '—'],
+        ['Operario', qc.operator_name || qc.created_by_data?.full_name || '—'],
         ['Cliente', qc.client],
         ['Ítem / Tramo', qc.item_tramo],
         ['Moto', qc.moto],

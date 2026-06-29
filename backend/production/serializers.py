@@ -106,6 +106,7 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
     shift_entries  = ProcessShiftEntrySerializer(many=True, read_only=True)
     rework_entries = ReworkEntrySerializer(many=True, read_only=True)
     active_shift_operator = serializers.SerializerMethodField()
+    active_shift_id   = serializers.SerializerMethodField()
     # Medios de manejo: si este es el proceso final y qué tipo de medio genera
     is_final_process  = serializers.SerializerMethodField()
     packing_unit_type = serializers.SerializerMethodField()
@@ -123,7 +124,7 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
                   'qty_done','qty_remaining','qty_good','qty_defective','qty_scrapped',
                   'progress_pct','started_at','finished_at',
                   'notes','signature','has_quality_check',
-                  'shift_entries','rework_entries','active_shift_operator',
+                  'shift_entries','rework_entries','active_shift_operator','active_shift_id',
                   'is_final_process','packing_unit_type']
         read_only_fields = ['signature']
 
@@ -131,13 +132,19 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
         return obj.get_process_label()
 
     def get_has_quality_check(self, obj):
-        return hasattr(obj, 'quality_check')
+        # ¿El turno activo ya tiene puesta a punto?
+        active = obj.active_shift
+        return bool(active and hasattr(active, 'quality_check'))
 
     def get_active_shift_operator(self, obj):
         active = obj.active_shift
         if active and active.operator:
             return UserMiniSerializer(active.operator).data
         return None
+
+    def get_active_shift_id(self, obj):
+        active = obj.active_shift
+        return active.id if active else None
 
     def get_is_final_process(self, obj):
         return obj.process_type == obj.batch.product_type.final_process

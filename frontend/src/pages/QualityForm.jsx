@@ -52,9 +52,9 @@ export default function QualityForm({ edit = false }) {
   useEffect(() => {
     Records.get(rid).then(r => {
       setRecord(r);
-      // If editing, fetch the existing QC
-      if (edit || r.has_quality_check) {
-        Quality.byRecord(rid).then(list => {
+      // La puesta a punto es POR TURNO: buscamos la del turno activo
+      if ((edit || r.has_quality_check) && r.active_shift_id) {
+        Quality.byShift(r.active_shift_id).then(list => {
           if (list.length > 0) {
             const qc = list[0];
             setQcId(qc.id);
@@ -88,9 +88,15 @@ export default function QualityForm({ edit = false }) {
     e.preventDefault();
     setSaving(true); setError(null);
     try {
-      const payload = { ...form, process_record: record.id };
-      if (qcId) await Quality.update(qcId, payload);
-      else      await Quality.create(payload);
+      if (qcId) {
+        await Quality.update(qcId, { ...form });
+      } else {
+        if (!record.active_shift_id) {
+          setError('Necesitas un turno activo para registrar la puesta a punto.');
+          setSaving(false); return;
+        }
+        await Quality.create({ ...form, shift_entry: record.active_shift_id });
+      }
       nav(`/lote/${record.batch}`);
     } catch (err) {
       setError(err.message);

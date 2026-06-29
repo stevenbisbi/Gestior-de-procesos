@@ -364,7 +364,8 @@ function ProcessRecordCard({ rec, batch, canStart, canFinish, onChange }) {
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
           <StatusBadge status={status} />
           <div className="flex gap-1 flex-wrap justify-end">
-            {(status === 'in_process' || status === 'paused' || status === 'finished') && (
+            {/* La puesta a punto es por turno: solo con turno activo */}
+            {status === 'in_process' && (
               <Link to={rec.has_quality_check ? `/calidad/ver/${rec.id}` : `/calidad/nuevo/${rec.id}`}
                 className="btn btn-outline btn-sm text-[11px]" style={{ borderColor: rec.has_quality_check ? undefined : '#d97706' }}>
                 {rec.has_quality_check ? '🔍 QC' : '+ QC'}
