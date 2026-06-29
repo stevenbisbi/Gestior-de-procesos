@@ -207,6 +207,10 @@ class ProductionBatch(models.Model):
                 rec.qty_assigned = prev_good
                 rec._recompute_status()
                 rec.save(update_fields=['qty_assigned', 'status', 'finished_at'])
+            # Encadenar: el siguiente proceso recibe las buenas de ESTE, no las
+            # del que originó el cambio. Así la merma se acumula a lo largo de
+            # toda la ruta en lugar de aplicarse una sola vez.
+            prev_good = rec.qty_good
             prev_good = rec.qty_good
         self._recalc_status()
 
@@ -565,16 +569,38 @@ class ProcessRecord(models.Model):
         """Turno actualmente en curso (sin finished_at), o None."""
         return self.shift_entries.filter(finished_at__isnull=True).first()
 
+    def _upstream_finished(self):
+        """
+        True si el proceso anterior en la ruta ya terminó (o si este es el
+        primero). Sirve para distinguir un qty_assigned=0 "porque arriba aún
+        no produjo" (sigue pendiente) de uno "porque toda la pieza se descartó
+        arriba" (sí puede darse por terminado, no hay nada que procesar).
+        """
+        route = self.batch.product_type.get_process_route()
+        if self.process_type not in route:
+            return True
+        idx = route.index(self.process_type)
+        if idx == 0:
+            return True
+        prev = self.batch.records.filter(process_type=route[idx - 1]).first()
+        return bool(prev and prev.status == 'finished')
+
     def _recompute_status(self):
         """
         Recalcula el estado a partir de qty_done vs qty_assigned (sin guardar).
         Usado al re-propagar cantidades aguas abajo: si la merma reduce el
         qty_assigned por debajo de lo ya hecho → finished; si una recuperación
         lo sube por encima → vuelve a paused.
+
+        Caso borde: qty_assigned=0. Solo se da por terminado si el proceso
+        anterior YA terminó (toda la pieza se descartó arriba, no hay nada
+        que hacer). Si el anterior sigue en curso/pendiente, este permanece
+        'pending' — evita que un proceso aguas abajo se marque 'Terminado'
+        con 0 piezas antes de que el anterior le entregue material.
         """
         if self.active_shift:
             self.status = 'in_process'
-        elif self.qty_done >= self.qty_assigned:
+        elif self.qty_done >= self.qty_assigned and (self.qty_assigned > 0 or self._upstream_finished()):
             self.status = 'finished'
             if not self.finished_at:
                 self.finished_at = timezone.now()
