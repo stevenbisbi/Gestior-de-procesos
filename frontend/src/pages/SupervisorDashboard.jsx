@@ -60,9 +60,9 @@ export default function SupervisorDashboard() {
           <div className="stat-sub">Sin recibir aún</div>
         </div>
         <Link to="/canasta" className="stat-card hover:bg-blue-50/40 hover:border-blue-200 transition cursor-pointer">
-          <div className="stat-num text-blue-600">{stats.in_basket}</div>
+          <div className="stat-num text-blue-600">{stats.basket_specs ?? 0}</div>
           <div className="stat-label">En canasta</div>
-          <div className="stat-sub">Ver canasta →</div>
+          <div className="stat-sub">{stats.basket_tubes ?? 0} tubos · Ver canasta →</div>
         </Link>
         <div className="stat-card">
           <div className="stat-num text-amber-600">{stats.in_process}</div>

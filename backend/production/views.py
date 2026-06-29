@@ -428,10 +428,21 @@ def supervisor_dashboard(request):
         batch__in=active, qty_defective__gt=0,
     ).aggregate(total=Sum('qty_defective'))
 
+    # Canasta real: inventario de tubos largos por tipo (independiente del lote).
+    # Cuenta los TubeSpec con stock > 0 y el total físico de tubos disponibles.
+    basket_rows = (TubeReception.objects
+                   .values('tube_spec')
+                   .annotate(total=Sum('quantity'))
+                   .filter(total__gt=0))
+    basket_specs = len(basket_rows)
+    basket_tubes = sum(r['total'] for r in basket_rows)
+
     return Response({
         'process_stats': process_stats,
         'waiting_material': active.filter(status='waiting_material').count(),
         'in_basket':        active.filter(status='in_basket').count(),
+        'basket_specs':     basket_specs,
+        'basket_tubes':     basket_tubes,
         'in_process':       active.filter(status='in_process').count(),
         'finished':         active.filter(status='finished').count(),
         'with_defects':     batches_with_defects.count(),
