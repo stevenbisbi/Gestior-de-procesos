@@ -231,10 +231,44 @@ class ProductionBatch(models.Model):
 
     @property
     def tube_stock(self):
-        """Tubos largos recibidos para ESTE lote (recepciones ligadas al lote)."""
+        """Tubos largos disponibles del lote = recepciones − consumos (recepciones negativas)."""
         from django.db.models import Sum
         agg = self.material_receptions.aggregate(t=Sum('quantity'))
         return agg['t'] or 0
+
+    @property
+    def sections_per_tube(self):
+        """Cuántos tramos (piezas) salen de cada tubo largo."""
+        line = getattr(self, 'program_line', None)
+        if line and line.sections_per_tube:
+            return line.sections_per_tube
+        # Fallback: longitud del tubo largo / longitud de corte
+        ts = self.product_type.tube_spec
+        cl = self.product_type.cut_length
+        if ts and cl and cl > 0:
+            return int(ts.original_length // cl)
+        return 0
+
+    def consume_tubes_for_cut(self, pieces, user):
+        """
+        Descuenta de la canasta los tubos largos consumidos al cortar `pieces` piezas.
+        tubos = ceil(piezas / tramos_por_tubo). Registra una recepción negativa.
+        """
+        import math
+        spt = self.sections_per_tube
+        if not spt or spt <= 0 or pieces <= 0:
+            return 0
+        tubes = math.ceil(pieces / spt)
+        tubes = min(tubes, self.tube_stock)   # no bajar de 0
+        if tubes > 0:
+            TubeReception.objects.create(
+                tube_spec=self.product_type.tube_spec,
+                quantity=-tubes,
+                delivered_by='Consumo de corte',
+                notes=f'{pieces} piezas cortadas',
+                received_by=user, batch=self,
+            )
+        return tubes
 
     def add_packing_units(self, user, quantities):
         """Crea un PackingUnit por cada cantidad en la lista (estiba o caja según el producto)."""

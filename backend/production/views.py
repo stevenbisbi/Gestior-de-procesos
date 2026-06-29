@@ -247,6 +247,10 @@ class ProcessRecordViewSet(viewsets.ReadOnlyModelViewSet):
         except Exception as e:
             return Response({'detail': str(e)}, status=400)
 
+        # Si es CORTE, descontar los tubos largos consumidos de la canasta
+        if record.process_type == 'corte':
+            record.batch.consume_tubes_for_cut(qty, request.user)
+
         # Medios de manejo (estibas/cajas) reportados en este turno — solo proceso final
         packing = request.data.get('packing_units') or []
         if packing and record.process_type == record.batch.product_type.final_process:
