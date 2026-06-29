@@ -1,40 +1,34 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Batches, TubeReceptions, Catalog } from '../lib/api';
+import { TubeReceptions, Batches, Catalog } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Loading, Alert } from '../components/Common';
 import { formatDateTime } from '../lib/utils';
 
+const SHAPE_ICON = { square: '🟦', round: '🔵', rectangular: '🟦' };
+
 export default function Canasta() {
-  const { user }              = useAuth();
-  const [inBasket, setInBasket] = useState([]);   // in_basket + in_process (con material)
-  const [waiting, setWaiting] = useState([]);   // solo para el selector del modal
+  const { user }            = useAuth();
+  const [tubes, setTubes]   = useState([]);   // basket: [{tube_spec, total, last_received}]
   const [history, setHistory] = useState([]);
+  const [waiting, setWaiting] = useState([]); // lotes waiting_material para el modal de recepción
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState('');
   const [showReceive, setShowReceive] = useState(false);
-  const [editTubes, setEditTubes]     = useState(null);  // lote a editar tubos largos
+  const [adjustSpec, setAdjustSpec]   = useState(null); // tube_spec_data a editar
 
   const refresh = async () => {
     setLoading(true);
     try {
-      const [b, p, w, h] = await Promise.all([
-        Batches.list({ status: 'in_basket' }),
-        Batches.list({ status: 'in_process' }),
-        Batches.list({ status: 'waiting_material' }),
+      const [basket, hist, w] = await Promise.all([
+        TubeReceptions.basket(),
         TubeReceptions.list({}),
+        Batches.list({ status: 'waiting_material' }),
       ]);
-      // En canasta = mientras el CORTE no esté terminado.
-      // (in_basket = corte sin empezar; in_process = puede estar cortándose
-      //  o ya en otro proceso → solo se queda si el corte aún no terminó)
-      const corteSinTerminar = [...b, ...p].filter(x => {
-        const corte = (x.process_route || []).find(r => r.process_type === 'corte');
-        return corte && corte.status !== 'finished';
-      });
-      setInBasket(corteSinTerminar);
+      setTubes(basket);
+      setHistory(hist);
       setWaiting(w);
-      setHistory(h);
     } catch (e) { setErr(e.message); }
     finally     { setLoading(false); }
   };
@@ -43,100 +37,101 @@ export default function Canasta() {
 
   if (loading) return <Loading />;
 
-  // Estado del corte de un lote: 'pending' | 'in_process' | 'paused'
-  const corteStatus = (b) =>
-    (b.process_route || []).find(r => r.process_type === 'corte')?.status || 'pending';
-  const cortando = inBasket.filter(b => ['in_process', 'paused'].includes(corteStatus(b)));
-  const listos   = inBasket.filter(b => corteStatus(b) === 'pending');
+  const totalTubes = tubes.reduce((s, t) => s + (t.total || 0), 0);
 
   return (
     <div className="space-y-5">
       {/* Cabecera */}
       <div className="bg-navy text-white rounded-2xl px-5 py-4">
-        <p className="text-xs text-white/60 font-medium uppercase tracking-wide">Recepción · Material para cortar</p>
-        <h2 className="text-2xl font-bold mt-0.5">🧺 Canasta</h2>
+        <p className="text-xs text-white/60 font-medium uppercase tracking-wide">Inventario de material</p>
+        <h2 className="text-2xl font-bold mt-0.5">Canasta</h2>
         <p className="text-sm text-white/60 mt-0.5">
-          <strong className="text-green-300">{listos.length}</strong> listos para cortar
-          {cortando.length > 0 && (
-            <> · <strong className="text-amber-300">{cortando.length}</strong> cortándose</>
-          )}
+          <strong className="text-green-300">{totalTubes.toLocaleString()}</strong> tubos largos en planta
+          {' · '}
+          <strong className="text-white">{tubes.filter(t => t.total > 0).length}</strong> tipos disponibles
         </p>
         <button onClick={() => setShowReceive(true)}
-          className="mt-3 inline-flex items-center gap-2 text-white font-medium hover:text-green-300 transition">
-          📥 Recibir tubería suelta
+          className="mt-3 inline-flex items-center gap-2 text-white font-medium hover:text-green-300 transition text-sm">
+          📥 Recibir tubería
         </button>
       </div>
 
       {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
 
-      {/* Hint */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-xs text-blue-900 flex items-start gap-2">
-        <span className="text-base">💡</span>
-        <span>
-          Los tubos largos son una <strong>pila compartida por tipo de tubo</strong>: las referencias del
-          mismo tubo cortan del mismo stock. Si llega tubería <strong>sin orden previa</strong>, usá
-          <em> "Recibir tubería suelta"</em>; para un lote que esperaba material, elegilo en el formulario.
-        </span>
-      </div>
-
-      {/* En canasta */}
+      {/* Inventario por tipo de tubo */}
       <section>
-        <SectionTitle accent="green">
-          🧺 En canasta <span className="text-slate-500 font-normal">({inBasket.length})</span>
-        </SectionTitle>
-        {inBasket.length === 0 ? (
-          <EmptyMsg text="Aún no hay lotes con material recibido." />
+        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+          Tubos largos disponibles
+        </div>
+
+        {tubes.length === 0 ? (
+          <div className="bg-slate-50 border border-slate-100 rounded-xl py-8 text-center text-sm text-slate-400">
+            No hay tubería registrada en la canasta todavía.
+          </div>
         ) : (
           <div className="space-y-2">
-            {inBasket.map(b => {
-              const enProceso = ['in_process', 'paused'].includes(corteStatus(b));
+            {tubes.map(row => {
+              const ts = row.tube_spec;
+              const qty = row.total ?? 0;
+              const shape = ts.shape || 'round';
               return (
-              <div key={b.id}
-                className={`bg-white rounded-xl border border-slate-100 shadow-sm border-l-4 p-3.5 flex items-center gap-3
-                  ${enProceso ? 'border-l-amber-500' : 'border-l-green-500'}`}>
-                <div className="w-11 h-11 rounded-lg bg-slate-100 flex items-center justify-center text-xl flex-shrink-0"
-                  title={b.tube_shape === 'square' ? 'Cuadrado' : 'Redondo'}>
-                  {b.tube_shape === 'square' ? '🟦' : '🔵'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {b.item_code && (
-                      <Link to={`/lote/${b.id}`} className="font-semibold text-blue-800 hover:underline truncate">
-                        {b.item_code}
-                      </Link>
-                    )}
-                    <Link to={`/lote/${b.id}`} className="font-semibold text-slate-800 hover:text-blue-600 hover:underline truncate">
-                      {b.product_name}
-                    </Link>
-                    {enProceso && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">
-                        ⚙ En proceso
-                      </span>
-                    )}
+                <div key={ts.id}
+                  className={`bg-white rounded-xl border border-slate-100 shadow-sm p-3.5 flex items-center gap-3
+                    ${qty <= 0 ? 'opacity-60' : ''}`}>
+                  {/* Ícono forma */}
+                  <div className="w-11 h-11 rounded-lg bg-slate-100 flex items-center justify-center text-xl flex-shrink-0"
+                    title={ts.shape_display}>
+                    {SHAPE_ICON[shape] || '🔵'}
                   </div>
-                  <div className="text-xs text-slate-400 truncate">{b.tube_label}</div>
+
+                  {/* Detalles del tubo */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-800 text-sm leading-tight">
+                      Ø {ts.outer_diameter} × {ts.thickness} mm
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap gap-x-2">
+                      <span>{ts.material_display}</span>
+                      <span>·</span>
+                      <span>{ts.shape_display}</span>
+                      <span>·</span>
+                      <span className="font-mono">{ts.original_length?.toLocaleString() ?? '—'} mm largo</span>
+                      {ts.saw_type_display && (
+                        <><span>·</span><span>Sierra {ts.saw_type_display}</span></>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      Última recepción: {formatDateTime(row.last_received)}
+                    </div>
+                  </div>
+
+                  {/* Cantidad */}
+                  <div className={`flex flex-col items-center px-3 flex-shrink-0 ${qty <= 0 ? 'text-red-500' : 'text-green-700'}`}>
+                    <span className="font-mono text-2xl font-bold leading-none">
+                      {qty.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide text-slate-400">tubos</span>
+                  </div>
+
+                  {/* Ajustar (solo supervisor) */}
+                  {user.is_supervisor && (
+                    <button type="button" onClick={() => setAdjustSpec({ ts, current: qty })}
+                      className="btn btn-outline btn-sm flex-shrink-0" title="Ajustar cantidad">
+                      ✏️
+                    </button>
+                  )}
                 </div>
-                {/* Tubos largos disponibles (pila compartida por tipo de tubo) — editable */}
-                <button type="button" onClick={() => setEditTubes(b)}
-                  className="flex flex-col items-center px-3 flex-shrink-0 rounded-lg hover:bg-slate-50 transition"
-                  title="Stock compartido de este tipo de tubo. Click para ajustar.">
-                  <span className="font-mono text-xl font-bold text-green-700 leading-none">
-                    {(b.tube_stock ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-[10px] uppercase tracking-wide text-slate-400">tubos largos ✏️</span>
-                </button>
-                <Link to={`/lote/${b.id}`} className="btn btn-outline btn-sm flex-shrink-0">Ver lote</Link>
-              </div>
               );
             })}
           </div>
         )}
       </section>
 
-      {/* Recepciones recientes — solo el supervisor */}
+      {/* Recepciones recientes — solo supervisor */}
       {user.is_supervisor && history.length > 0 && (
         <section>
-          <SectionTitle>📋 Recepciones recientes</SectionTitle>
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            Recepciones recientes
+          </div>
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -144,7 +139,7 @@ export default function Canasta() {
                   <tr>
                     <th className="text-left py-2.5 px-3 whitespace-nowrap">Fecha</th>
                     <th className="text-left py-2.5 px-3">Tubería</th>
-                    <th className="text-center py-2.5 px-3">Cantidad</th>
+                    <th className="text-center py-2.5 px-3">Cant.</th>
                     <th className="text-left py-2.5 px-3">Lote</th>
                     <th className="text-left py-2.5 px-3">Almacén</th>
                     <th className="text-left py-2.5 px-3">Recibió</th>
@@ -152,20 +147,21 @@ export default function Canasta() {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.slice(0, 30).map(r => (
+                  {history.slice(0, 40).map(r => (
                     <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
                       <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-nowrap">
                         {formatDateTime(r.received_at)}
                       </td>
                       <td className="py-2.5 px-3">
-                        <div className="text-xs font-medium text-slate-700">
-                          {r.tube_spec_data?.label}
-                        </div>
+                        <div className="text-xs font-medium text-slate-700">{r.tube_spec_data?.label}</div>
                         <div className="text-[10px] text-slate-400">
                           {r.tube_spec_data?.shape_display} · {r.tube_spec_data?.material_display}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-green-600">+{r.quantity}</td>
+                      <td className="py-2.5 px-3 text-center font-mono font-bold"
+                        style={{ color: r.quantity >= 0 ? '#16a34a' : '#dc2626' }}>
+                        {r.quantity >= 0 ? '+' : ''}{r.quantity}
+                      </td>
                       <td className="py-2.5 px-3 text-xs">
                         {r.batch
                           ? <Link to={`/lote/${r.batch}`} className="text-blue-600 hover:underline">Ver</Link>
@@ -173,7 +169,9 @@ export default function Canasta() {
                       </td>
                       <td className="py-2.5 px-3 text-xs text-slate-600">{r.delivered_by || '—'}</td>
                       <td className="py-2.5 px-3 text-xs text-slate-600">{r.received_by_data?.full_name || '—'}</td>
-                      <td className="py-2.5 px-3 text-xs text-slate-500 max-w-[200px]">{r.notes || '—'}</td>
+                      <td className="py-2.5 px-3 text-xs text-slate-500 max-w-[180px] truncate" title={r.notes || ''}>
+                        {r.notes || '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -191,28 +189,30 @@ export default function Canasta() {
           onCreated={() => { setShowReceive(false); refresh(); }}
         />
       )}
-      {editTubes && (
-        <EditTubesModal
-          batch={editTubes}
-          onClose={() => setEditTubes(null)}
-          onSaved={() => { setEditTubes(null); refresh(); }}
+
+      {adjustSpec && (
+        <AdjustSpecModal
+          ts={adjustSpec.ts}
+          current={adjustSpec.current}
+          onClose={() => setAdjustSpec(null)}
+          onSaved={() => { setAdjustSpec(null); refresh(); }}
         />
       )}
     </div>
   );
 }
 
-// ── Modal para corregir la cantidad de tubos largos de un lote ───────────────
-function EditTubesModal({ batch, onClose, onSaved }) {
-  const [qty, setQty]     = useState(String(batch.tube_stock ?? 0));
+// ── Modal para ajustar stock por tipo de tubo (supervisor) ───────────────────
+function AdjustSpecModal({ ts, current, onClose, onSaved }) {
+  const [qty, setQty]       = useState(String(current));
   const [saving, setSaving] = useState(false);
-  const [err, setErr]     = useState('');
+  const [err, setErr]       = useState('');
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true); setErr('');
     try {
-      await Batches.adjustTubes(batch.id, { quantity: Number(qty) });
+      await TubeReceptions.adjustSpec({ tube_spec_id: ts.id, quantity: Number(qty) });
       onSaved();
     } catch (ex) { setErr(ex.message); }
     finally      { setSaving(false); }
@@ -226,8 +226,11 @@ function EditTubesModal({ batch, onClose, onSaved }) {
         <form onSubmit={submit}>
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
             <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">Editar tubos largos</p>
-              <h2 className="text-base font-bold text-slate-800 truncate max-w-[220px]">{batch.product_name}</h2>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">Ajustar stock</p>
+              <h2 className="text-base font-bold text-slate-800">
+                Ø {ts.outer_diameter} × {ts.thickness} mm · {ts.material_display}
+              </h2>
+              <p className="text-xs text-slate-500">{ts.original_length?.toLocaleString()} mm largo</p>
             </div>
             <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
           </div>
@@ -235,12 +238,17 @@ function EditTubesModal({ batch, onClose, onSaved }) {
             {err && <Alert kind="error" onClose={() => setErr('')}>{err}</Alert>}
             <label className="block">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
-                Cantidad de tubos largos recibidos
+                Nueva cantidad total de tubos largos
               </span>
               <input type="number" min="0" required className={inp}
                 value={qty} onChange={e => setQty(e.target.value)} autoFocus />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Se registra un ajuste con la diferencia respecto a {batch.tube_stock ?? 0}.
+                Stock actual: <strong>{current}</strong>
+                {Number(qty) !== current && (
+                  <span className={Number(qty) > current ? ' text-green-600' : ' text-red-600'}>
+                    {' '}→ {Number(qty) > current ? '+' : ''}{Number(qty) - current}
+                  </span>
+                )}
               </span>
             </label>
           </div>
@@ -337,7 +345,7 @@ function ReceiveTubeModal({ user, waiting = [], onClose, onCreated }) {
                 </select>
                 {form.batch && (
                   <span className="text-[10px] text-amber-600 mt-1 block">
-                    El lote pasará a "En canasta".
+                    El lote pasará a estado "En canasta".
                   </span>
                 )}
               </label>
@@ -357,7 +365,7 @@ function ReceiveTubeModal({ user, waiting = [], onClose, onCreated }) {
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">Cantidad de tubos largos recibidos</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">Cantidad de tubos largos</span>
               <input type="number" min="1" required className={inp}
                 value={form.quantity} onChange={e => set('quantity', e.target.value)} placeholder="ej. 150"/>
             </label>
@@ -385,20 +393,5 @@ function ReceiveTubeModal({ user, waiting = [], onClose, onCreated }) {
       </div>
     </div>,
     document.body
-  );
-}
-
-function SectionTitle({ children, accent }) {
-  const accentCls = accent === 'green' ? 'text-green-700' : 'text-slate-400';
-  return (
-    <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${accentCls}`}>{children}</div>
-  );
-}
-
-function EmptyMsg({ text }) {
-  return (
-    <div className="bg-slate-50 border border-slate-100 rounded-xl py-6 text-center text-sm text-slate-400">
-      {text}
-    </div>
   );
 }

@@ -108,7 +108,8 @@ export const CuttingLines = {
 };
 
 export const TubeReceptions = {
-  list:    (params = {}) => api.get('/tube-receptions/?' + new URLSearchParams(params)),
-  create:  (data)        => api.post('/tube-receptions/', data),
-  basket:  ()            => api.get('/tube-receptions/basket/'),
+  list:       (params = {}) => api.get('/tube-receptions/?' + new URLSearchParams(params)),
+  create:     (data)        => api.post('/tube-receptions/', data),
+  basket:     ()            => api.get('/tube-receptions/basket/'),
+  adjustSpec: (data)        => api.post('/tube-receptions/adjust-spec/', data),
 };

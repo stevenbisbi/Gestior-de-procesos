@@ -381,6 +381,32 @@ class TubeReceptionViewSet(viewsets.ModelViewSet):
             })
         return Response(out)
 
+    @action(detail=False, methods=['post'], url_path='adjust-spec')
+    def adjust_spec(self, request):
+        """Ajusta el stock total de un tipo de tubo (supervisor). Crea una recepción con la diferencia."""
+        from django.db.models import Sum
+        ts_id = request.data.get('tube_spec_id')
+        try:
+            target = int(request.data.get('quantity'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'Cantidad inválida.'}, status=400)
+        if target < 0:
+            return Response({'detail': 'La cantidad no puede ser negativa.'}, status=400)
+        try:
+            tube_spec = TubeSpec.objects.get(id=ts_id)
+        except TubeSpec.DoesNotExist:
+            return Response({'detail': 'Especificación no encontrada.'}, status=404)
+        current = TubeReception.objects.filter(tube_spec=tube_spec).aggregate(t=Sum('quantity'))['t'] or 0
+        delta = target - current
+        if delta != 0:
+            TubeReception.objects.create(
+                tube_spec=tube_spec, quantity=delta,
+                delivered_by='Ajuste de conteo',
+                notes=f'Ajuste manual: {current} → {target}',
+                received_by=request.user,
+            )
+        return Response({'tube_spec_id': ts_id, 'new_total': target})
+
 
 # ─── Dashboards ─────────────────────────────────────────
 
