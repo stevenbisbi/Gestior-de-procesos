@@ -92,6 +92,13 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        # En LISTADOS: los lotes de un programa en BORRADOR no son trabajo
+        # liberado a planta, así que no deben aparecer para recibir material,
+        # en canasta ni en otros listados. (Los lotes sin programa —manuales— y
+        # los de programas activos/cerrados sí.) En el detalle (get_object) no se
+        # filtra, para que el supervisor pueda abrir el lote desde el programa.
+        if self.action == 'list':
+            qs = qs.exclude(program_line__program__status='draft')
         # Filtros de query params
         status_param = self.request.query_params.get('status')
         q = self.request.query_params.get('q')
@@ -149,6 +156,9 @@ class ProductionBatchViewSet(viewsets.ModelViewSet):
         batch = self.get_object()
         if batch.status != 'waiting_material':
             return Response({'detail': 'Este lote no está esperando material.'}, status=400)
+        line = getattr(batch, 'program_line', None)
+        if line and line.program.status == 'draft':
+            return Response({'detail': 'El programa de este lote aún no está activo.'}, status=400)
         tube_spec = None
         ts_id = request.data.get('tube_spec') or batch.product_type.tube_spec_id
         if ts_id:
@@ -412,7 +422,10 @@ class TubeReceptionViewSet(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 def supervisor_dashboard(request):
-    active = ProductionBatch.objects.exclude(status='dispatched')
+    # Excluye despachados y lotes de programas en borrador (no liberados a planta).
+    active = (ProductionBatch.objects
+              .exclude(status='dispatched')
+              .exclude(program_line__program__status='draft'))
     process_stats = {}
     for pt in ['corte', 'chaflan', 'moleteo', 'curvado']:
         process_stats[pt] = {
