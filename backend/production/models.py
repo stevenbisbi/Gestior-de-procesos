@@ -231,13 +231,9 @@ class ProductionBatch(models.Model):
 
     @property
     def tube_stock(self):
-        """Tubos largos disponibles del tipo de tubo de este producto (todas las recepciones)."""
+        """Tubos largos recibidos para ESTE lote (recepciones ligadas al lote)."""
         from django.db.models import Sum
-        if not self.product_type.tube_spec_id:
-            return 0
-        agg = TubeReception.objects.filter(
-            tube_spec_id=self.product_type.tube_spec_id
-        ).aggregate(t=Sum('quantity'))
+        agg = self.material_receptions.aggregate(t=Sum('quantity'))
         return agg['t'] or 0
 
     def add_packing_units(self, user, quantities):
