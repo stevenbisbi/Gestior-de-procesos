@@ -59,6 +59,10 @@ function LineForm({ program, onSave, onCancel, initial }) {
   // Recibe (id, producto) desde el ProductPicker — autorrellena del producto
   const handleProductChange = (pid, p) => {
     if (!p) { set('product_type', pid); return; }
+    const largo = Number(p.tube_spec_data?.original_length) || null;
+    const corte = Number(p.cut_length) || 0;
+    // Tramos por tubo = cuántas piezas salen de cada tubo largo
+    const tramos = (largo && corte > 0) ? Math.floor(largo / corte) : null;
     setForm(f => ({
       ...f,
       product_type: pid,
@@ -67,6 +71,9 @@ function LineForm({ program, onSave, onCancel, initial }) {
       rpm:              f.rpm               || p.rpm,
       saw_type:         f.saw_type !== 'hss' ? f.saw_type : (p.saw_type !== 'none' ? p.saw_type : f.saw_type),
       tube_description: f.tube_description  || `${p.tube_spec_data?.label || ''} x ${p.cut_length}mm`,
+      // ── Tubo largo (materia prima) ──
+      tube_length_mm:    f.tube_length_mm    || (largo ?? ''),
+      sections_per_tube: f.sections_per_tube || (tramos ?? ''),
     }));
   };
 
@@ -135,7 +142,17 @@ function LineForm({ program, onSave, onCancel, initial }) {
           <input className={inpCls} type="number" min="1" required value={form.pedido_quantity} onChange={e=>set('pedido_quantity',e.target.value)}/>
         </Field>
         <Field label="Total a cortar" hint="Piezas que se van a cortar realmente">
-          <input className={inpCls} type="number" min="1" required value={form.total_quantity} onChange={e=>set('total_quantity',e.target.value)}/>
+          <input className={inpCls} type="number" min="1" required value={form.total_quantity}
+            onChange={e => {
+              const total = e.target.value;
+              const tramos = Number(form.sections_per_tube) || 0;
+              setForm(f => ({
+                ...f,
+                total_quantity: total,
+                // tubos largos = ceil(total / tramos por tubo)
+                tube_count: tramos > 0 && total ? String(Math.ceil(Number(total) / tramos)) : f.tube_count,
+              }));
+            }}/>
         </Field>
         <Field label="Piezas/hora"><input className={inpCls} type="number" value={form.pieces_per_hour} onChange={e=>set('pieces_per_hour',e.target.value)}/></Field>
       </Section>
