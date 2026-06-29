@@ -25,8 +25,14 @@ export default function Canasta() {
         Batches.list({ status: 'waiting_material' }),
         TubeReceptions.list({}),
       ]);
-      // Lotes con material en planta: en canasta + en proceso (no terminados)
-      setInBasket([...b, ...p]);
+      // En canasta = mientras el CORTE no esté terminado.
+      // (in_basket = corte sin empezar; in_process = puede estar cortándose
+      //  o ya en otro proceso → solo se queda si el corte aún no terminó)
+      const corteSinTerminar = [...b, ...p].filter(x => {
+        const corte = (x.process_route || []).find(r => r.process_type === 'corte');
+        return corte && corte.status !== 'finished';
+      });
+      setInBasket(corteSinTerminar);
       setWaiting(w);
       setHistory(h);
     } catch (e) { setErr(e.message); }
@@ -37,6 +43,12 @@ export default function Canasta() {
 
   if (loading) return <Loading />;
 
+  // Estado del corte de un lote: 'pending' | 'in_process' | 'paused'
+  const corteStatus = (b) =>
+    (b.process_route || []).find(r => r.process_type === 'corte')?.status || 'pending';
+  const cortando = inBasket.filter(b => ['in_process', 'paused'].includes(corteStatus(b)));
+  const listos   = inBasket.filter(b => corteStatus(b) === 'pending');
+
   return (
     <div className="space-y-5">
       {/* Cabecera */}
@@ -44,9 +56,9 @@ export default function Canasta() {
         <p className="text-xs text-white/60 font-medium uppercase tracking-wide">Recepción · Material para cortar</p>
         <h2 className="text-2xl font-bold mt-0.5">🧺 Canasta</h2>
         <p className="text-sm text-white/60 mt-0.5">
-          <strong className="text-green-300">{inBasket.filter(b => b.status === 'in_basket').length}</strong> listos para cortar
-          {inBasket.some(b => b.status === 'in_process') && (
-            <> · <strong className="text-amber-300">{inBasket.filter(b => b.status === 'in_process').length}</strong> en proceso</>
+          <strong className="text-green-300">{listos.length}</strong> listos para cortar
+          {cortando.length > 0 && (
+            <> · <strong className="text-amber-300">{cortando.length}</strong> cortándose</>
           )}
         </p>
         <button onClick={() => setShowReceive(true)}
@@ -76,7 +88,7 @@ export default function Canasta() {
         ) : (
           <div className="space-y-2">
             {inBasket.map(b => {
-              const enProceso = b.status === 'in_process';
+              const enProceso = ['in_process', 'paused'].includes(corteStatus(b));
               return (
               <div key={b.id}
                 className={`bg-white rounded-xl border border-slate-100 shadow-sm border-l-4 p-3.5 flex items-center gap-3
