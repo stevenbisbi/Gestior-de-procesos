@@ -116,10 +116,13 @@ class ProcessRecordSerializer(serializers.ModelSerializer):
     batch_priority_display = serializers.CharField(source='batch.get_priority_display', read_only=True)
     product_name           = serializers.CharField(source='batch.product_type.name', read_only=True)
     product_item           = serializers.CharField(source='batch.product_type.item_code', read_only=True)
+    product_client         = serializers.CharField(source='batch.product_type.client', read_only=True)
+    tube_material          = serializers.CharField(source='batch.product_type.tube_spec.material', read_only=True)
 
     class Meta:
         model = ProcessRecord
         fields = ['id','batch','batch_code','batch_priority','batch_priority_display','product_name','product_item',
+                  'product_client','tube_material',
                   'process_type','process_label','sequence','machine','machine_data',
                   'operator','operator_data','shift','status','status_display','qty_assigned',
                   'qty_done','qty_remaining','qty_good','qty_defective','qty_scrapped',

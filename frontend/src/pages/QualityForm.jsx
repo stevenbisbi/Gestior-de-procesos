@@ -29,6 +29,11 @@ function todayStr() {
 
 const NC_VALUES = ['no', 'no_conforme'];
 
+// Turno de producción (A/B/C/D) → turno del QC (T1/T2/T3/T5)
+const SHIFT_MAP = { A: 'T1', B: 'T2', C: 'T3', D: 'T5' };
+// Material del tubo → opción de "tipo de lámina" (mismas claves; gv no tiene material)
+const LAMINA_KEYS = ['cr', 'gv', 'hr', 'cr_est', 'hr_est'];
+
 export default function QualityForm({ edit = false }) {
   const { rid } = useParams();
   const nav = useNavigate();
@@ -62,8 +67,15 @@ export default function QualityForm({ edit = false }) {
           }
         }).finally(() => setLoading(false));
       } else {
-        // Set default NA fields based on process type
+        // QC nuevo: prellenar lo que ya se sabe del lote/turno (todo editable)
         const updates = {};
+        if (r.shift && SHIFT_MAP[r.shift]) updates.shift = SHIFT_MAP[r.shift];
+        if (r.product_client) updates.client = r.product_client;
+        if (r.product_item)   updates.item_tramo = r.product_item;
+        if (r.tube_material && LAMINA_KEYS.includes(r.tube_material)) {
+          updates.sheet_type = r.tube_material;
+        }
+        // Campos N/A por defecto según el tipo de proceso
         if (r.process_type !== 'corte') {
           updates.saw_type_ref = 'NA'; updates.rpm_ref = 'NA';
         }
