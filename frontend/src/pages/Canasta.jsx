@@ -97,8 +97,8 @@ export default function Canasta() {
         )}
       </section>
 
-      {/* Recepciones recientes */}
-      {history.length > 0 && (
+      {/* Recepciones recientes — solo el supervisor */}
+      {user.is_supervisor && history.length > 0 && (
         <section>
           <SectionTitle>📋 Recepciones recientes</SectionTitle>
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
