@@ -70,14 +70,13 @@ export default function Canasta() {
           </div>
         ) : (
           <div className="space-y-2">
-            {tubes.map(row => {
+            {tubes.filter(row => (row.total ?? 0) > 0).map(row => {
               const ts = row.tube_spec;
               const qty = row.total ?? 0;
               const shape = ts.shape || 'round';
               return (
                 <div key={ts.id}
-                  className={`bg-white rounded-xl border border-slate-100 shadow-sm p-3.5 flex items-center gap-3
-                    ${qty <= 0 ? 'opacity-60' : ''}`}>
+                  className="bg-white rounded-xl border border-slate-100 shadow-sm p-3.5 flex items-center gap-3">
                   {/* Ícono forma */}
                   <div className="w-11 h-11 rounded-lg bg-slate-100 flex items-center justify-center text-xl flex-shrink-0"
                     title={ts.shape_display}>
@@ -87,17 +86,13 @@ export default function Canasta() {
                   {/* Detalles del tubo */}
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-slate-800 text-sm leading-tight">
-                      Ø {ts.outer_diameter} × {ts.thickness} mm
+                      Ø {ts.outer_diameter} × {ts.thickness} x {ts.original_length?.toLocaleString() ?? '—'} mm
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap gap-x-2">
                       <span>{ts.material_display}</span>
                       <span>·</span>
                       <span>{ts.shape_display}</span>
-                      <span>·</span>
-                      <span className="font-mono">{ts.original_length?.toLocaleString() ?? '—'} mm largo</span>
-                      {ts.saw_type_display && (
-                        <><span>·</span><span>Sierra {ts.saw_type_display}</span></>
-                      )}
+                      
                     </div>
                     <div className="text-[10px] text-slate-400 mt-0.5">
                       Última recepción: {formatDateTime(row.last_received)}
@@ -147,7 +142,7 @@ export default function Canasta() {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.slice(0, 40).map(r => (
+                  {history.filter(r => r.delivered_by !== 'Consumo de corte').slice(0, 40).map(r => (
                     <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50">
                       <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-nowrap">
                         {formatDateTime(r.received_at)}
