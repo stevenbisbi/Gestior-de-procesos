@@ -6,6 +6,7 @@ import { Loading } from '../components/Common';
 import { NewBatchModal } from './BatchList';
 import { CreateProductModal } from '../components/ProductPicker';
 import Defectuosos from './Defectuosos';
+import Canasta from './Canasta';
 
 export default function MaterialEnPlanta() {
   return (
@@ -20,10 +21,10 @@ export default function MaterialEnPlanta() {
 const STATUSES = [
   { v: '',                 label: 'Todos' },
   { v: 'waiting_material', label: 'Esperando material' },
-  { v: 'in_basket',        label: 'En canasta' },
+  { v: 'canasta',          label: '🧺 En canasta' },   // vista especial → página Canasta
   { v: 'in_process',       label: 'En proceso' },
   { v: 'finished',         label: 'Terminados' },
-  { v: 'defectuosos',      label: '🔧 Defectuosos' },  // vista especial (no es estado de lote)
+  { v: 'defectuosos',      label: '🔧 Defectuosos' },  // vista especial → página Defectuosos
 ];
 
 function TodoTab() {
@@ -37,9 +38,11 @@ function TodoTab() {
   const [tubes, setTubes] = useState([]);
 
   const isDefectos = status === 'defectuosos';
+  const isCanasta  = status === 'canasta';
+  const isSpecial  = isDefectos || isCanasta;
 
   const fetchData = () => {
-    if (isDefectos) { setLoading(false); return; }
+    if (isSpecial) { setLoading(false); return; }
     setLoading(true);
     Batches.list({ q, status, exclude_dispatched: '1' })
       .then(setBatches).finally(() => setLoading(false));
@@ -56,8 +59,8 @@ function TodoTab() {
 
   return (
     <div className="space-y-3">
-      {/* Acciones — solo cuando NO estamos en la vista de defectuosos */}
-      {!isDefectos && (
+      {/* Acciones — solo en las vistas de tabla (no en Canasta/Defectuosos) */}
+      {!isSpecial && (
         <div className="flex gap-2 flex-wrap items-center">
           <form onSubmit={e => { e.preventDefault(); fetchData(); }} className="flex gap-2 flex-1 min-w-[200px]">
             <input type="text" placeholder="Buscar por código, producto o tubo…"
@@ -84,8 +87,10 @@ function TodoTab() {
         ))}
       </div>
 
-      {/* Vista de defectuosos o tabla de lotes */}
-      {isDefectos ? (
+      {/* Vista especial (Canasta / Defectuosos) o tabla de lotes */}
+      {isCanasta ? (
+        <Canasta />
+      ) : isDefectos ? (
         <Defectuosos />
       ) : (
         <>
