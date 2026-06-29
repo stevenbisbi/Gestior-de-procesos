@@ -78,12 +78,11 @@ function MachineCard({ item }) {
           <div className="space-y-3">
             {/* Lote y producto */}
             <Link to={`/lote/${item.active.batch_id}`} className="block group">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-mono text-xs text-slate-400">{item.active.batch_code}</span>
-                <span className="text-[10px] text-blue-500 group-hover:underline">→ ver lote</span>
-              </div>
-              <div className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
-                {item.active.product_name}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
+                  {item.active.product_name}
+                </span>
+                <span className="text-[10px] text-blue-500 group-hover:underline">→ ver</span>
               </div>
               <div className="text-xs text-slate-400 truncate">{item.active.tube_label}</div>
             </Link>
@@ -129,7 +128,6 @@ function MachineCard({ item }) {
               <div>
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Última actividad</div>
                 <Link to={`/lote/${item.last_activity.batch_id}`} className="block group">
-                  <div className="font-mono text-xs text-slate-400">{item.last_activity.batch_code}</div>
                   <div className="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors truncate">
                     {item.last_activity.product_name}
                   </div>

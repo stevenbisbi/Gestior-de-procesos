@@ -83,15 +83,14 @@ export default function Defectuosos() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <Link to={`/lote/${rec.batch}`}
-                      className="font-mono text-sm font-semibold text-blue-600 hover:underline">
-                      {rec.batch_code}
+                      className="font-semibold text-slate-800 hover:text-blue-600 hover:underline">
+                      {rec.product_name}
                     </Link>
-                    <span className="text-sm font-medium text-slate-700">·</span>
-                    <span className="font-semibold text-slate-800">
+                    <span className="text-sm text-slate-400">·</span>
+                    <span className="text-sm font-medium text-slate-600">
                       {PROCESS_LABELS[rec.process_type]}
                     </span>
                   </div>
-                  <div className="text-sm text-slate-600">{rec.product_name}</div>
 
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-2 mt-3 text-center">
@@ -201,7 +200,7 @@ function ReworkModal({ record, user, onClose, onSaved }) {
           <div className="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-2">
             <div>
               <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">Reincorporar tubería</p>
-              <h2 className="text-lg font-bold text-slate-800">{record.batch_code} · {PROCESS_LABELS[record.process_type]}</h2>
+              <h2 className="text-lg font-bold text-slate-800">{record.product_name} · {PROCESS_LABELS[record.process_type]}</h2>
               <p className="text-xs text-slate-500">{record.product_name}</p>
             </div>
             <button type="button" onClick={onClose}

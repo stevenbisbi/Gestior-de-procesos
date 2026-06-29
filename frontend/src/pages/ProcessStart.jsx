@@ -53,7 +53,7 @@ export default function ProcessStart() {
         <div className="card-body flex items-center gap-3">
           <ProcIcon type={record.process_type} size="lg" />
           <div className="flex-1">
-            <div className="font-mono text-xs text-slate-400">Lote #{record.batch}</div>
+            <div className="text-xs text-slate-400">{record.product_name}</div>
             <div className="text-base font-bold">{record.process_label}</div>
           </div>
           <div className="text-right">

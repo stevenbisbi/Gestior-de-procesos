@@ -245,8 +245,8 @@ function ProgramLineRow({ line, isSupervisor, onEdit, onDelete }) {
         {line.batch_id ? (
           <div className="flex flex-col items-center gap-1">
             <Link to={`/lote/${line.batch_id}`}
-              className="text-xs font-mono text-blue-600 hover:underline">
-              {line.batch_code}
+              className="text-xs text-blue-600 hover:underline">
+              Ver lote
             </Link>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bs.cls}`}>
               {bs.label}

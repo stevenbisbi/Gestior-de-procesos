@@ -36,7 +36,7 @@ export default function QualityReport() {
             {data.nc_checks.map(qc => (
               <div key={qc.id} className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
                 <div>
-                  <div className="font-bold text-sm">{qc.batch_code} — {qc.process_label}</div>
+                  <div className="font-bold text-sm">{qc.product_name} — {qc.process_label}</div>
                   <div className="text-xs text-slate-600 mt-0.5">
                     {formatDate(qc.date)} · {qc.created_by_data?.full_name || '—'}
                   </div>
@@ -66,7 +66,7 @@ export default function QualityReport() {
               <thead className="bg-slate-50 text-slate-600 text-[11px] uppercase">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold">Fecha</th>
-                  <th className="px-3 py-2 text-left font-semibold">Lote</th>
+                  <th className="px-3 py-2 text-left font-semibold">Producto</th>
                   <th className="px-3 py-2 text-left font-semibold">Proceso</th>
                   <th className="px-3 py-2 text-left font-semibold">Operario</th>
                   <th className="px-3 py-2 text-left font-semibold">Dim.</th>
@@ -80,7 +80,7 @@ export default function QualityReport() {
                 {data.checks.map(qc => (
                   <tr key={qc.id} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="px-3 py-2.5 text-xs">{formatDate(qc.date)}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{qc.batch_code}</td>
+                    <td className="px-3 py-2.5 text-xs">{qc.product_name}</td>
                     <td className="px-3 py-2.5">{qc.process_label}</td>
                     <td className="px-3 py-2.5 text-xs">{qc.created_by_data?.full_name || '—'}</td>
                     <td className="px-3 py-2.5"><MiniBadge val={qc.dimensions_ok} /></td>

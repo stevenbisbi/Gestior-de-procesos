@@ -111,8 +111,8 @@ export default function QualityForm({ edit = false }) {
       <div className="bg-navy-mid text-white rounded-xl p-3 flex items-center gap-3 mb-4">
         <ProcIcon type={record.process_type} />
         <div className="flex-1">
-          <div className="text-[11px] text-white/50 uppercase tracking-wider">Lote · Proceso</div>
-          <div className="font-semibold">Lote #{record.batch} — {record.process_label}</div>
+          <div className="text-[11px] text-white/50 uppercase tracking-wider">Producto · Proceso</div>
+          <div className="font-semibold">{record.product_name} — {record.process_label}</div>
         </div>
         <div className="text-right">
           <div className="text-[11px] text-white/50">Operario</div>

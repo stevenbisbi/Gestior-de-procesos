@@ -101,8 +101,8 @@ function LineDetailModal({ line, onClose }) {
               <div>
                 <p className="text-[10px] text-blue-700 uppercase tracking-wide font-bold">Lote generado</p>
                 <Link to={`/lote/${line.batch_id}`}
-                  className="text-base font-mono font-bold text-blue-700 hover:underline">
-                  {line.batch_code}
+                  className="text-base font-bold text-blue-700 hover:underline">
+                  Ver lote
                 </Link>
               </div>
               <span className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${bs.cls}`}>
@@ -290,8 +290,8 @@ export default function CuttingProgramOperator() {
                       {line.batch_id ? (
                         <div className="flex flex-col items-center gap-1.5">
                           <Link to={`/lote/${line.batch_id}`}
-                            className="text-xs font-mono font-semibold text-blue-600 hover:underline">
-                            {line.batch_code}
+                            className="text-xs font-semibold text-blue-600 hover:underline">
+                            Ver lote
                           </Link>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${bs.cls}`}>
                             <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${bs.dot}`}/>

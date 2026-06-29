@@ -98,7 +98,7 @@ export default function ProcessFinish() {
         <ProcIcon type={record.process_type} />
         <div className="flex-1">
           <div className="font-bold">{record.process_label}</div>
-          <div className="text-xs text-slate-400">Lote #{record.batch}</div>
+          <div className="text-xs text-slate-400">{record.product_name}</div>
         </div>
         <StatusBadge status="in_process" />
       </div>

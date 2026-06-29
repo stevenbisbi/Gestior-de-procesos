@@ -71,7 +71,6 @@ export default function BatchDetail() {
           <div className="flex items-start justify-between gap-4 mb-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-mono text-sm text-slate-400">{batch.batch_code}</span>
                 <StatusBadge status={batch.status} />
               </div>
               <h2 className="text-lg font-bold">{batch.product_type_data?.name}</h2>
@@ -126,7 +125,7 @@ export default function BatchDetail() {
             <span className="card-title">
               {tube.shape === 'square' ? '🟦' : '🔵'} Características del tubo
             </span>
-            <span className="text-xs text-slate-400">🪵 {(batch.tube_stock ?? 0).toLocaleString()} tubos largos recibidos</span>
+            <span className="text-xs text-slate-400"> {(batch.tube_stock ?? 0).toLocaleString()} tubos largos recibidos</span>
           </div>
           <div className="card-body">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-5 text-sm">
@@ -257,7 +256,7 @@ function EditBatchModal({ batch, onClose, onSaved, onError }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-8">
         <form onSubmit={submit}>
           <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-800">✏️ Editar lote {batch.batch_code}</h2>
+            <h2 className="text-lg font-bold text-slate-800">✏️ Editar lote</h2>
             <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
           </div>
 

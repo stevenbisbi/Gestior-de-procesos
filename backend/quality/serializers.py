@@ -7,6 +7,7 @@ class QualityCheckSerializer(serializers.ModelSerializer):
     has_nonconformity = serializers.BooleanField(read_only=True)
     created_by_data   = UserMiniSerializer(source='created_by', read_only=True)
     batch_code        = serializers.CharField(source='process_record.batch.batch_code', read_only=True)
+    product_name      = serializers.CharField(source='process_record.batch.product_type.name', read_only=True)
     process_label     = serializers.SerializerMethodField()
     process_type      = serializers.CharField(source='process_record.process_type', read_only=True)
 

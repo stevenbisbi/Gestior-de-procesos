@@ -24,7 +24,7 @@ export default function DimensionalLog() {
       <div className="bg-navy-mid text-white rounded-xl p-3.5 flex items-center justify-between gap-3 mb-4">
         <div>
           <div className="text-[11px] text-white/50">Registro dimensional en proceso</div>
-          <div className="text-base font-bold">Lote #{record.batch} — {record.process_label}</div>
+          <div className="text-base font-bold">{record.product_name} — {record.process_label}</div>
         </div>
         <div className="text-right">
           {ncCount > 0 ? (

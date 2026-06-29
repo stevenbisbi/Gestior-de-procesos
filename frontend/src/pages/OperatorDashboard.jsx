@@ -53,7 +53,6 @@ export default function OperatorDashboard() {
                   <ProcIcon type={rec.process_type} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="font-mono text-xs text-slate-400">{rec.batch_code || `#${rec.batch}`}</span>
                       <PriorityTag priority={rec.batch_priority} />
                     </div>
                     <div className="font-semibold">{rec.process_label}
@@ -106,7 +105,6 @@ export default function OperatorDashboard() {
                   <ProcIcon type={rec.process_type} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <span className="font-mono text-xs text-slate-400">{rec.batch_code || `#${rec.batch}`}</span>
                       <PriorityTag priority={rec.batch_priority} />
                     </div>
                     <div className="font-semibold">{rec.process_label}

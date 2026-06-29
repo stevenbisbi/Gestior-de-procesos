@@ -63,7 +63,6 @@ export function BatchCard({ batch, to }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-sm text-slate-600">{batch.batch_code}</span>
           <StatusBadge status={batch.status} />
         </div>
         <div className="font-semibold text-slate-800 truncate">{productName}</div>

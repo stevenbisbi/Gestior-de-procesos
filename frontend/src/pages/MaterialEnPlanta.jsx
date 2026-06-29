@@ -179,9 +179,10 @@ function BatchRow({ b, showEstado = true }) {
         {shapeEmoji}
       </td>
       <td className="px-4 py-3">
+        <div className="font-semibold text-sm text-blue-800">{b.item_code}</div>
         <div className="font-semibold text-sm text-slate-800">{b.product_name}</div>
         <div className="text-[11px] text-slate-400">
-          {b.item_code && <span className="font-mono">{b.item_code} · </span>}
+          
           {b.tube_label} · {b.cut_length?.toFixed(0)} mm
         </div>
       </td>
