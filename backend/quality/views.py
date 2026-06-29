@@ -75,8 +75,20 @@ class DimensionalLogViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 def supervisor_quality_report(request):
     checks = QualityCheck.objects.select_related(
-        'process_record__batch__product_type','process_record__machine','created_by'
-    ).order_by('-created_at')[:200]
+        'process_record__batch__product_type','process_record__machine',
+        'shift_entry__operator','created_by'
+    ).order_by('-created_at')
+    # Filtros por fecha
+    date     = request.query_params.get('date')      # fecha exacta
+    date_from = request.query_params.get('from')
+    date_to   = request.query_params.get('to')
+    if date:
+        checks = checks.filter(date=date)
+    if date_from:
+        checks = checks.filter(date__gte=date_from)
+    if date_to:
+        checks = checks.filter(date__lte=date_to)
+    checks = checks[:200]
     data = QualityCheckSerializer(checks, many=True).data
     nc = [c for c in data if c.get('has_nonconformity')]
     return Response({'checks': data, 'nc_checks': nc, 'total': len(data), 'nc_total': len(nc)})

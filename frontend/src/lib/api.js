@@ -83,7 +83,7 @@ export const Quality = {
   get:     (id)          => api.get(`/quality/checks/${id}/`),
   create:  (data)        => api.post('/quality/checks/', data),
   update:  (id, data)    => api.put(`/quality/checks/${id}/`, data),
-  report:  ()            => api.get('/quality/report/'),
+  report:  (params = {}) => api.get('/quality/report/?' + new URLSearchParams(params)),
 };
 
 export const DimLogs = {

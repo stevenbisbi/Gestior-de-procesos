@@ -7,15 +7,44 @@ import { formatDate } from '../lib/utils';
 export default function QualityReport() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [from, setFrom] = useState('');
+  const [to, setTo]     = useState('');
 
-  useEffect(() => {
-    Quality.report().then(setData).finally(() => setLoading(false));
-  }, []);
+  const load = (params = {}) => {
+    setLoading(true);
+    Quality.report(params).then(setData).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const applyFilter = () => {
+    const p = {};
+    if (from) p.from = from;
+    if (to)   p.to   = to;
+    load(p);
+  };
+  const clearFilter = () => { setFrom(''); setTo(''); load(); };
 
   if (loading || !data) return <Loading />;
 
   return (
     <div className="space-y-5">
+      {/* Filtro por fecha */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Desde</span>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Hasta</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        </label>
+        <button onClick={applyFilter} className="btn btn-primary">Buscar</button>
+        {(from || to) && <button onClick={clearFilter} className="btn btn-outline">Limpiar</button>}
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="stat-card">
           <div className="stat-num">{data.total}</div>
