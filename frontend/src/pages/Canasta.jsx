@@ -73,8 +73,9 @@ export default function Canasta() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-xs text-blue-900 flex items-start gap-2">
         <span className="text-base">💡</span>
         <span>
-          Si la tubería llega <strong>sin orden previa</strong>, usá <em>"Recibir tubería suelta"</em>.
-          Para recibir material de un lote que estaba esperando, elegí el lote dentro del mismo formulario.
+          Los tubos largos son una <strong>pila compartida por tipo de tubo</strong>: las referencias del
+          mismo tubo cortan del mismo stock. Si llega tubería <strong>sin orden previa</strong>, usá
+          <em> "Recibir tubería suelta"</em>; para un lote que esperaba material, elegilo en el formulario.
         </span>
       </div>
 
@@ -115,11 +116,10 @@ export default function Canasta() {
                   </div>
                   <div className="text-xs text-slate-400 truncate">{b.tube_label}</div>
                 </div>
-                {/* Tubos largos recibidos — destacado + editable */}
+                {/* Tubos largos disponibles (pila compartida por tipo de tubo) — editable */}
                 <button type="button" onClick={() => setEditTubes(b)}
                   className="flex flex-col items-center px-3 flex-shrink-0 rounded-lg hover:bg-slate-50 transition"
-                  title="Editar cantidad de tubos largos">
-                  
+                  title="Stock compartido de este tipo de tubo. Click para ajustar.">
                   <span className="font-mono text-xl font-bold text-green-700 leading-none">
                     {(b.tube_stock ?? 0).toLocaleString()}
                   </span>

@@ -231,9 +231,17 @@ class ProductionBatch(models.Model):
 
     @property
     def tube_stock(self):
-        """Tubos largos disponibles del lote = recepciones − consumos (recepciones negativas)."""
+        """
+        Pila COMPARTIDA de tubos largos por tipo de tubo: suma de todas las
+        recepciones (de cualquier lote) menos los consumos, del mismo TubeSpec.
+        Cualquier lote de ese tipo corta de esta pila común.
+        """
         from django.db.models import Sum
-        agg = self.material_receptions.aggregate(t=Sum('quantity'))
+        if not self.product_type.tube_spec_id:
+            return 0
+        agg = TubeReception.objects.filter(
+            tube_spec_id=self.product_type.tube_spec_id
+        ).aggregate(t=Sum('quantity'))
         return agg['t'] or 0
 
     @property
