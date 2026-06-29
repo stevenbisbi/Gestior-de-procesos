@@ -19,12 +19,14 @@ export default function MaterialEnPlanta() {
 
 // ── Tabla de todos los lotes en planta ──────────────────────────────────────
 const STATUSES = [
+  // Filtros de la tabla
   { v: '',                 label: 'Todos' },
   { v: 'waiting_material', label: 'Esperando material' },
-  { v: 'canasta',          label: '🧺 En canasta' },   // vista especial → página Canasta
   { v: 'in_process',       label: 'En proceso' },
   { v: 'finished',         label: 'Terminados' },
-  { v: 'defectuosos',      label: '🔧 Defectuosos' },  // vista especial → página Defectuosos
+  // Vistas especiales (no filtran la tabla) — al final
+  { v: 'canasta',          label: 'En canasta' },   // → página Canasta
+  { v: 'defectuosos',      label: 'Defectuosos' },  // → página Defectuosos
 ];
 
 function TodoTab() {
@@ -106,7 +108,7 @@ function TodoTab() {
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50 text-slate-600 text-[11px] uppercase tracking-wider">
                       <tr>
-                        <th className="px-2 py-2.5 text-center font-semibold w-8" title="Forma del tubo">Forma</th>
+                        <th className="px-2 py-2.5 text-center font-semibold w-8" title="Forma del tubo"></th>
                         <th className="px-4 py-2.5 text-left font-semibold">Producto</th>
                         <th className="px-4 py-2.5 text-left font-semibold">Cant.</th>
                         <th className="px-4 py-2.5 text-left font-semibold">Prioridad</th>
