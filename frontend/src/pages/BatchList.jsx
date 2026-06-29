@@ -105,7 +105,7 @@ export default function BatchList() {
 }
 
 // ── Modal "+ Lote" — elige producto existente + cantidad + prioridad ────────
-function NewBatchModal({ onClose, onCreated }) {
+export function NewBatchModal({ onClose, onCreated }) {
   const nav = useNavigate();
   const [form, setForm] = useState({
     product_type: '', total_quantity: '', priority: 'media',
