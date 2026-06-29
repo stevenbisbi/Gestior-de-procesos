@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { Loading } from '../components/Common';
 import { NewBatchModal } from './BatchList';
 import { CreateProductModal } from '../components/ProductPicker';
+import Defectuosos from './Defectuosos';
 
 export default function MaterialEnPlanta() {
   return (
@@ -22,6 +23,7 @@ const STATUSES = [
   { v: 'in_basket',        label: 'En canasta' },
   { v: 'in_process',       label: 'En proceso' },
   { v: 'finished',         label: 'Terminados' },
+  { v: 'defectuosos',      label: '🔧 Defectuosos' },  // vista especial (no es estado de lote)
 ];
 
 function TodoTab() {
@@ -34,7 +36,10 @@ function TodoTab() {
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [tubes, setTubes] = useState([]);
 
+  const isDefectos = status === 'defectuosos';
+
   const fetchData = () => {
+    if (isDefectos) { setLoading(false); return; }
     setLoading(true);
     Batches.list({ q, status, exclude_dispatched: '1' })
       .then(setBatches).finally(() => setLoading(false));
@@ -51,22 +56,25 @@ function TodoTab() {
 
   return (
     <div className="space-y-3">
-      {/* Acciones */}
-      <div className="flex gap-2 flex-wrap items-center">
-        <form onSubmit={e => { e.preventDefault(); fetchData(); }} className="flex gap-2 flex-1 min-w-[200px]">
-          <input type="text" placeholder="Buscar por código, producto o tubo…"
-            value={q} onChange={e => setQ(e.target.value)}
-            className="form-input flex-1" />
-          <button type="submit" className="btn btn-primary">Filtrar</button>
-        </form>
-        {user.is_supervisor && (
-          <div className="flex gap-2">
-            <button onClick={openNewProduct} className="btn btn-outline">+ Producto</button>
-            <button onClick={() => setShowNewBatch(true)} className="btn btn-success">+ Lote</button>
-          </div>
-        )}
-      </div>
+      {/* Acciones — solo cuando NO estamos en la vista de defectuosos */}
+      {!isDefectos && (
+        <div className="flex gap-2 flex-wrap items-center">
+          <form onSubmit={e => { e.preventDefault(); fetchData(); }} className="flex gap-2 flex-1 min-w-[200px]">
+            <input type="text" placeholder="Buscar por código, producto o tubo…"
+              value={q} onChange={e => setQ(e.target.value)}
+              className="form-input flex-1" />
+            <button type="submit" className="btn btn-primary">Filtrar</button>
+          </form>
+          {user.is_supervisor && (
+            <div className="flex gap-2">
+              <button onClick={openNewProduct} className="btn btn-outline">+ Producto</button>
+              <button onClick={() => setShowNewBatch(true)} className="btn btn-success">+ Lote</button>
+            </div>
+          )}
+        </div>
+      )}
 
+      {/* Filtros / pestañas internas */}
       <div className="flex gap-2 flex-wrap">
         {STATUSES.map(s => (
           <button key={s.v} onClick={() => setStatus(s.v)}
@@ -76,43 +84,49 @@ function TodoTab() {
         ))}
       </div>
 
-      {/* Tabla */}
-      <div className="card">
-        <div className="overflow-x-auto scrollbar-thin">
-          {loading ? <Loading /> :
-            batches.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">
-                <div className="text-4xl mb-2">📦</div>
-                <p>No hay lotes con ese filtro.</p>
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-600 text-[11px] uppercase tracking-wider">
-                  <tr>
-                    <th className="px-4 py-2.5 text-left font-semibold">Producto</th>
-                    <th className="px-4 py-2.5 text-left font-semibold">Cant.</th>
-                    <th className="px-4 py-2.5 text-left font-semibold">Prioridad</th>
-                    <th className="px-4 py-2.5 text-left font-semibold">Estado</th>
-                    <th className="px-4 py-2.5 text-left font-semibold min-w-[200px]">Proceso actual</th>
-                    <th className="px-4 py-2.5 text-left font-semibold min-w-[130px]">Avance total</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {batches.map(b => <BatchRow key={b.id} b={b} />)}
-                </tbody>
-              </table>
-            )}
-        </div>
-      </div>
+      {/* Vista de defectuosos o tabla de lotes */}
+      {isDefectos ? (
+        <Defectuosos />
+      ) : (
+        <>
+          <div className="card">
+            <div className="overflow-x-auto scrollbar-thin">
+              {loading ? <Loading /> :
+                batches.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <div className="text-4xl mb-2">📦</div>
+                    <p>No hay lotes con ese filtro.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-600 text-[11px] uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left font-semibold">Producto</th>
+                        <th className="px-4 py-2.5 text-left font-semibold">Cant.</th>
+                        <th className="px-4 py-2.5 text-left font-semibold">Prioridad</th>
+                        <th className="px-4 py-2.5 text-left font-semibold">Estado</th>
+                        <th className="px-4 py-2.5 text-left font-semibold min-w-[200px]">Proceso actual</th>
+                        <th className="px-4 py-2.5 text-left font-semibold min-w-[130px]">Avance total</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batches.map(b => <BatchRow key={b.id} b={b} />)}
+                    </tbody>
+                  </table>
+                )}
+            </div>
+          </div>
 
-      <div className="text-xs text-slate-400 flex gap-3 flex-wrap">
-        <span className="text-amber-600">● Esperando material</span>
-        <span>● En canasta</span>
-        <span className="text-amber-600">● En proceso</span>
-        <span className="text-blue-600">● Pausado</span>
-        <span className="text-emerald-600">● Terminado</span>
-      </div>
+          <div className="text-xs text-slate-400 flex gap-3 flex-wrap">
+            <span className="text-amber-600">● Esperando material</span>
+            <span>● En canasta</span>
+            <span className="text-amber-600">● En proceso</span>
+            <span className="text-blue-600">● Pausado</span>
+            <span className="text-emerald-600">● Terminado</span>
+          </div>
+        </>
+      )}
 
       {showNewProduct && (
         <CreateProductModal
