@@ -2,11 +2,10 @@ import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 
 const TabsSupervisor = [
-  { to: '/supervisor',     label: 'Resumen',            icon: '📊' },
-  { to: '/maquinas',       label: 'Máquinas',           icon: '🏭' },
-  { to: '/material',       label: 'Material en planta', icon: '📦' },
-  { to: '/programa',       label: 'Programa',           icon: '📝' },
-  { to: '/calidad/reporte',label: 'Calidad',            icon: '✓'  },
+  { to: '/supervisor',     label: 'Resumen',  icon: '📊' },
+  { to: '/maquinas',       label: 'Máquinas', icon: '🏭' },
+  { to: '/programa',       label: 'Programa', icon: '📝' },
+  { to: '/calidad/reporte',label: 'Calidad',  icon: '✓'  },
 ];
 
 // Para operarios de corte (Bewo): programa + canasta de tubería

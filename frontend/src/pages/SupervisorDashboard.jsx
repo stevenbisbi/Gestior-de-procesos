@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Dashboard } from '../lib/api';
 import { Loading } from '../components/Common';
 import { PROCESS_LABELS, PROCESS_ICONS } from '../lib/utils';
+import MaterialEnPlanta from './MaterialEnPlanta';
 
 export default function SupervisorDashboard() {
   const [stats, setStats]     = useState(null);
@@ -73,7 +74,7 @@ export default function SupervisorDashboard() {
           <div className="stat-label">Terminados</div>
           <div className="stat-sub">Listos para despacho</div>
         </div>
-        <Link to="/material?tab=defectuosos" className="stat-card hover:bg-red-50/40 hover:border-red-200 transition cursor-pointer">
+        <Link to="/supervisor?tab=defectuosos" className="stat-card hover:bg-red-50/40 hover:border-red-200 transition cursor-pointer">
           <div className="stat-num text-red-600">{stats.with_defects || 0}</div>
           <div className="stat-label">Con defectos</div>
           <div className="stat-sub">{(stats.defective_qty || 0).toLocaleString()} pzs en rework</div>
@@ -85,6 +86,10 @@ export default function SupervisorDashboard() {
         </div>
       </div>
 
+      {/* Segunda sección: Material en planta (Todo / Canasta / Defectuosos) */}
+      <div className="pt-2">
+        <MaterialEnPlanta />
+      </div>
     </div>
   );
 }

@@ -24,7 +24,6 @@ import CuttingProgramOperator from './pages/CuttingProgramOperator';
 import MachinesStatus         from './pages/MachinesStatus';
 import Canasta                from './pages/Canasta';
 import Defectuosos            from './pages/Defectuosos';
-import MaterialEnPlanta       from './pages/MaterialEnPlanta';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -47,8 +46,8 @@ export default function App() {
       <Route element={<Protected><Layout /></Protected>}>
         {/* Supervisor */}
         <Route path="/supervisor"          element={<SupervisorDashboard />} />
-        <Route path="/material"            element={<MaterialEnPlanta />} />
-        <Route path="/lotes"               element={<MaterialEnPlanta />} />
+        <Route path="/material"            element={<Navigate to="/supervisor" replace />} />
+        <Route path="/lotes"               element={<Navigate to="/supervisor" replace />} />
         <Route path="/nuevo-lote"          element={<CreateBatch />} />
         <Route path="/lote/:id"            element={<BatchDetail />} />
         {/* Operario */}
