@@ -11,7 +11,6 @@ export default function Canasta() {
   const [inBasket, setInBasket] = useState([]);
   const [waiting, setWaiting] = useState([]);   // solo para el selector del modal
   const [history, setHistory] = useState([]);
-  const [basket, setBasket]   = useState([]);   // tubos largos disponibles por tipo de tubo
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState('');
   const [showReceive, setShowReceive] = useState(false);
@@ -19,16 +18,14 @@ export default function Canasta() {
   const refresh = async () => {
     setLoading(true);
     try {
-      const [b, w, h, bk] = await Promise.all([
+      const [b, w, h] = await Promise.all([
         Batches.list({ status: 'in_basket' }),
         Batches.list({ status: 'waiting_material' }),
         TubeReceptions.list({}),
-        TubeReceptions.basket(),
       ]);
       setInBasket(b);
       setWaiting(w);
       setHistory(h);
-      setBasket(bk);
     } catch (e) { setErr(e.message); }
     finally     { setLoading(false); }
   };
@@ -37,8 +34,6 @@ export default function Canasta() {
 
   if (loading) return <Loading />;
 
-  const totalTubes = basket.reduce((s, b) => s + (b.total || 0), 0);
-
   return (
     <div className="space-y-5">
       {/* Cabecera */}
@@ -46,7 +41,6 @@ export default function Canasta() {
         <p className="text-xs text-white/60 font-medium uppercase tracking-wide">Recepción · Material para cortar</p>
         <h2 className="text-2xl font-bold mt-0.5">🧺 Canasta</h2>
         <p className="text-sm text-white/60 mt-0.5">
-          <strong className="text-white">{totalTubes.toLocaleString()}</strong> tubos largos ·{' '}
           <strong className="text-green-300">{inBasket.length}</strong> lotes listos para cortar
         </p>
         <button onClick={() => setShowReceive(true)}
@@ -65,47 +59,6 @@ export default function Canasta() {
           Para recibir material de un lote que estaba esperando, elegí el lote dentro del mismo formulario.
         </span>
       </div>
-
-      {/* Tubos largos disponibles por referencia (desde recepciones) */}
-      {basket.length > 0 && (
-        <section>
-          <SectionTitle>🪵 Tubos largos disponibles por referencia</SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {basket.map(item => (
-              <div key={item.tube_spec.id}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-                <div className="flex items-baseline justify-between gap-2 mb-2">
-                  <span className="text-lg" title={item.tube_spec.shape === 'square' ? 'Cuadrado' : 'Redondo'}>
-                    {item.tube_spec.shape === 'square' ? '🟦' : '🔵'}
-                  </span>
-                  <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-medium">
-                    {item.tube_spec.material_display}
-                  </span>
-                </div>
-                <div className="font-mono text-lg font-bold text-slate-800">
-                  Ø {item.tube_spec.outer_diameter}
-                  <span className="text-slate-400 text-sm font-normal"> × {item.tube_spec.thickness} mm</span>
-                </div>
-                <div className="text-xs text-slate-500 mb-3">
-                  Largo: {item.tube_spec.original_length?.toFixed?.(0) || item.tube_spec.original_length} mm
-                </div>
-                <div className="border-t border-slate-100 pt-3 flex items-end justify-between">
-                  <div>
-                    <div className="text-[10px] uppercase text-slate-400 font-semibold">Tubos largos</div>
-                    <div className="font-mono text-2xl font-bold text-green-600 leading-none mt-0.5">
-                      {item.total.toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase text-slate-400 font-semibold">Última recepción</div>
-                    <div className="text-xs text-slate-500">{formatDateTime(item.last_received)}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* En canasta — listos para cortar */}
       <section>
@@ -134,7 +87,7 @@ export default function Canasta() {
                   </div>
                   <div className="font-semibold text-slate-800 truncate">{b.product_name}</div>
                   <div className="text-xs text-slate-500">
-                    {b.tube_label} · corte {b.cut_length?.toFixed?.(0) ?? b.cut_length} mm · <strong>{b.total_quantity?.toLocaleString()}</strong> uds
+                    🪵 <strong className="text-green-700">{(b.tube_stock ?? 0).toLocaleString()}</strong> tubos largos recibidos
                   </div>
                 </div>
                 <Link to={`/lote/${b.id}`} className="btn btn-outline btn-sm flex-shrink-0">Ver lote</Link>
