@@ -119,9 +119,11 @@ export default function Canasta() {
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="text-xs font-medium text-slate-700">
-                          Ø {r.tube_spec_data?.outer_diameter} × {r.tube_spec_data?.thickness}
+                          {r.tube_spec_data?.label}
                         </div>
-                        <div className="text-[10px] text-slate-400">{r.tube_spec_data?.material_display}</div>
+                        <div className="text-[10px] text-slate-400">
+                          {r.tube_spec_data?.shape_display} · {r.tube_spec_data?.material_display}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono font-bold text-green-600">+{r.quantity}</td>
                       <td className="py-2.5 px-3 text-xs">
