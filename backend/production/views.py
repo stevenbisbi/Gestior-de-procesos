@@ -481,12 +481,15 @@ def machines_status(request):
                 .select_related('process_record__batch__product_type', 'operator')
                 .order_by('-finished_at')
                 .first())
-        # Procesos disponibles para esta máquina (pendientes o pausados)
+        # Procesos disponibles para esta máquina (pendientes o pausados).
+        # waiting_material cuenta si la canasta ya tiene tubos del tipo
+        # (is_available_for_process decide); borradores de programa no.
         candidate_records = ProcessRecord.objects.filter(
             process_type=m.process_type,
             status__in=['pending', 'paused'],
-            batch__status__in=['in_basket', 'in_process'],
-        ).select_related('batch')
+            batch__status__in=['waiting_material', 'in_basket', 'in_process'],
+        ).exclude(batch__program_line__program__status='draft') \
+         .select_related('batch')
         queue = [r for r in candidate_records if r.batch.is_available_for_process(r.process_type)]
 
         item = {
@@ -538,11 +541,15 @@ def operator_tasks(request):
     machines = Machine.objects.filter(operators=request.user, is_active=True)
     process_types = list(machines.values_list('process_type', flat=True).distinct())
 
+    # waiting_material se incluye porque el corte puede arrancar si la canasta
+    # (pila compartida) ya tiene tubos del tipo — is_available_for_process decide.
+    # Se excluyen los lotes de programas en borrador (no liberados a planta).
     available = ProcessRecord.objects.filter(
         process_type__in=process_types,
         status__in=['pending', 'in_process', 'paused'],
-        batch__status__in=['in_basket', 'in_process']
-    ).select_related('batch__product_type__tube_spec', 'machine')
+        batch__status__in=['waiting_material', 'in_basket', 'in_process']
+    ).exclude(batch__program_line__program__status='draft') \
+     .select_related('batch__product_type__tube_spec', 'machine')
 
     # "Mis activos": turnos que YO tengo abiertos en este momento
     my_active   = available.filter(status='in_process', operator=request.user)

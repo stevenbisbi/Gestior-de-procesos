@@ -144,7 +144,12 @@ class ProductionBatch(models.Model):
             return False
         idx = route.index(process_type)
         if idx == 0:
-            return self.status in ('in_basket', 'in_process')
+            if self.status in ('in_basket', 'in_process'):
+                return True
+            # La canasta es una pila COMPARTIDA por tipo de tubo: si ya hay
+            # tubos largos de este tipo, el cortador puede arrancar sin esperar
+            # una nueva entrega de almacén para este lote en particular.
+            return self.status == 'waiting_material' and self.tube_stock > 0
         prev = self.records.filter(process_type=route[idx-1]).first()
         # El proceso anterior debe estar terminado (todo lo bueno ya producido)
         return prev and prev.status == 'finished'
@@ -636,7 +641,9 @@ class ProcessRecord(models.Model):
         self.status = 'in_process'
         self.save(update_fields=['operator','machine','shift','started_at','status'])
 
-        if self.batch.status == 'in_basket':
+        # waiting_material también pasa a in_process: el corte pudo arrancar
+        # porque la canasta ya tenía tubos de este tipo (pila compartida).
+        if self.batch.status in ('in_basket', 'waiting_material'):
             self.batch.status = 'in_process'
             self.batch.save(update_fields=['status', 'updated_at'])
         return entry

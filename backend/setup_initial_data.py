@@ -310,20 +310,7 @@ make_logs(r1c, U['operario1'], [
 print(f"✓ {b1.batch_code}  TUBO 22.2 x 911mm CUR — Terminado")
 
 # ══════════════════════════════════════════════════════════════════
-# 2. Manubrio 22.2x874 CUR — DESPACHADO
-# ══════════════════════════════════════════════════════════════════
-b2 = make_batch(PROD_874, 300, 'media', -5, sup)
-r2c  = setup_process(b2, 'corte',   'finished', [(U['operario3'], M['Bewo 2'],        'B', 300, 20, 18)])
-r2ch = setup_process(b2, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'A', 298, 18, 17)])
-r2m  = setup_process(b2, 'moleteo', 'finished', [(U['operario2'], M['Moleteadora'],   'B', 298, 17, 16)])
-r2cu = setup_process(b2, 'curvado', 'finished', [(U['operario4'], M['Socco 2'],       'A', 296, 16, 15)])
-mark_batch_status(b2)
-dispatch_batch(b2, 14)
-make_qc(r2c, 20, 'T2', 'MotoPartes', '236570', 'Honda XR 190',
-        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '874.0', '873.8', '874.2', '', U['operario3'])
-print(f"✓ {b2.batch_code}  TUBO 22.2 x 874mm CUR — Despachado")
+
 
 # ══════════════════════════════════════════════════════════════════
 # 3. Defensa 22.2x905 — DESPACHADO
@@ -339,48 +326,7 @@ make_qc(r3c, 22, 'T1', 'MotoPartes (DIO)', '255321', 'Honda DIO',
         '905.1', '904.9', '905.0', '', U['operario1'])
 print(f"✓ {b3.batch_code}  TUBO 22.2 x 905mm — Despachado")
 
-# ══════════════════════════════════════════════════════════════════
-# 4. TUB CR REDONDO 5/8 x 880mm — TERMINADO (corte simple)
-# ══════════════════════════════════════════════════════════════════
-b4 = make_batch(PROD_580_5_8, 1000, 'baja', -1, U['operario1'])
-r4c = setup_process(b4, 'corte', 'finished', [(U['operario3'], M['Bewo 2'], 'C', 1000, 8, 7)])
-mark_batch_status(b4)
-make_qc(r4c, 8, 'T3', 'Infantiles ABBA Limitada', '877135', 'Triciclo IA-200',
-        'si', 'cr', 'si', 'HSS Ø5/8', '2400 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '880.0', '879.8', '880.1', 'Tubería para tricilo infantil', U['operario3'])
-print(f"✓ {b4.batch_code}  TUB CR REDONDO 5/8 x 880mm — Terminado")
 
-# ══════════════════════════════════════════════════════════════════
-# 5. Manubrio 22.2x920 CUR — TERMINADO (corte en 2 turnos handoff)
-# ══════════════════════════════════════════════════════════════════
-b5 = make_batch(PROD_920, 400, 'alta', -1, sup, 'Pedido urgente MotoPartes')
-# Corte: Operario 1 cerró su turno con 200, Operario 3 continuó y terminó las 200 restantes
-r5c  = setup_process(b5, 'corte', 'finished', [
-    (U['operario1'], M['Bewo 1'], 'A', 200, 9, 9),
-    (U['operario3'], M['Bewo 1'], 'B', 200, 9, 8),
-])
-r5ch = setup_process(b5, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'B', 398, 8, 7)])
-r5m  = setup_process(b5, 'moleteo', 'finished', [(U['operario2'], M['Moleteadora'],   'A', 398, 7, 6)])
-r5cu = setup_process(b5, 'curvado', 'finished', [(U['operario3'], M['Socco 2'],       'B', 395, 6, 5)])
-mark_batch_status(b5)
-make_qc(r5c, 9, 'T1', 'MotoPartes', '255330', 'Honda XR 250',
-        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '920.0', '919.9', '920.2', 'Pedido urgente revisado', U['operario1'])
-print(f"✓ {b5.batch_code}  TUBO 22.2 x 920mm CUR — Terminado (corte en 2 turnos)")
-
-# ══════════════════════════════════════════════════════════════════
-# 6. TUBO RECT 20x40 x 343mm — TERMINADO (corte simple)
-# ══════════════════════════════════════════════════════════════════
-b6 = make_batch(PROD_RECT_343, 800, 'media', 2, U['operario3'])
-r6c = setup_process(b6, 'corte', 'finished', [(U['operario1'], M['Bewo 1'], 'A', 800, 6, 5)])
-mark_batch_status(b6)
-make_qc(r6c, 6, 'T1', 'MotoPartes', '358395', 'Varias',
-        'si', 'cr', 'si', 'TCT 20x40', '1600 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '343.1', '343.0', '342.9', '', U['operario1'])
-print(f"✓ {b6.batch_code}  TUBO RECT 20x40 x 343mm — Terminado")
 
 # ══════════════════════════════════════════════════════════════════
 # 7. TUBO 22.2 x 911mm CUR — EN PROCESO (corte ✓, chaflan activo)
@@ -412,67 +358,6 @@ make_qc(r8c, 1, 'T2', 'MotoPartes (Yamaha)', '328671', 'Yamaha YZ 150',
         '843.2', '843.0', '842.8', 'Cierre de turno - faltan 70 uds', U['operario1'])
 print(f"✓ {b8.batch_code}  TUBO 25.4 x 843mm — Pausado (corte 80/150, esperando relevo)")
 
-# ══════════════════════════════════════════════════════════════════
-# 9. TUBO 22.2 x 874mm CUR — EN PROCESO (corte ✓, chaflan ✓, moleteo PAUSADO)
-# ══════════════════════════════════════════════════════════════════
-b9 = make_batch(PROD_874, 450, 'alta', 0, sup, 'Segunda corrida MotoPartes')
-r9c  = setup_process(b9, 'corte',   'finished', [(U['operario3'], M['Bewo 2'],        'A', 450, 5, 4)])
-r9ch = setup_process(b9, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'B', 448, 4, 3)])
-# Moleteo: Operario 2 hizo 250 y cerró turno (queda pausado)
-r9m = b9.records.get(process_type='moleteo')
-add_shift(r9m, U['operario2'], M['Moleteadora'], 'A', 250, 2, 2)
-finalize_record(r9m, 'paused')
-mark_batch_status(b9)
-make_qc(r9c, 5, 'T2', 'MotoPartes', '236570', 'Honda XR 190',
-        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '874.1', '874.0', '873.9', '', U['operario3'])
-print(f"✓ {b9.batch_code}  TUBO 22.2 x 874mm CUR — En proceso (moleteo pausado 250/450)")
-
-# ══════════════════════════════════════════════════════════════════
-# 10. TUB CR REDONDO 3/4 x 250mm — EN PROCESO (corte activo)
-# ══════════════════════════════════════════════════════════════════
-b10 = make_batch(PROD_250_3_4, 500, 'media', 2, U['operario1'])
-r10c = b10.records.get(process_type='corte')
-add_shift(r10c, U['operario1'], M['Bewo 1'], 'C', 120, 1, None)  # turno activo
-finalize_record(r10c, 'in_process')
-mark_batch_status(b10)
-make_qc(r10c, 1, 'T3', 'Infantiles ABBA Limitada', '877136', 'Triciclo IA-200',
-        'si', 'cr', 'si', 'HSS Ø3/4', '2400 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '250.0', '250.1', '250.2', 'Turno nocturno, revisión inicial OK', U['operario1'])
-print(f"✓ {b10.batch_code}  TUB CR REDONDO 3/4 x 250mm — En proceso (corte 120/500)")
-
-# ══════════════════════════════════════════════════════════════════
-# 11. TUBO 22.2 x 385mm PIPE REAR — EN PROCESO (corte ✓, chaflan ✓, moleteo activo)
-# ══════════════════════════════════════════════════════════════════
-b11 = make_batch(PROD_385, 250, 'alta', 1, sup)
-r11c  = setup_process(b11, 'corte',   'finished', [(U['operario3'], M['Bewo 2'],        'B', 250, 4, 3)])
-r11ch = setup_process(b11, 'chaflan', 'finished', [(U['operario2'], M['Chaflaneadora'], 'A', 248, 3, 2)])
-r11m  = b11.records.get(process_type='moleteo')
-add_shift(r11m, U['operario2'], M['Moleteadora'], 'B', 80, 1, None)  # turno activo
-finalize_record(r11m, 'in_process')
-mark_batch_status(b11)
-make_qc(r11c, 4, 'T2', 'MotoPartes (CB125 New)', '358393', 'Honda CB125 New',
-        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '385.0', '384.8', '385.1', '', U['operario3'])
-print(f"✓ {b11.batch_code}  TUBO 22.2 x 385mm PIPE REAR — En proceso (moleteo 80/250)")
-
-# ══════════════════════════════════════════════════════════════════
-# 12. TUBO 22.2 x 766mm — EN PROCESO (corte ✓, chaflan activo)
-# ══════════════════════════════════════════════════════════════════
-b12 = make_batch(PROD_766, 350, 'media', 4, U['operario2'])
-r12c = setup_process(b12, 'corte', 'finished', [(U['operario1'], M['Bewo 1'], 'A', 350, 2, 1)])
-r12ch = b12.records.get(process_type='chaflan')
-add_shift(r12ch, U['operario2'], M['Chaflaneadora'], 'B', 100, 1, None)  # turno activo
-finalize_record(r12ch, 'in_process')
-mark_batch_status(b12)
-make_qc(r12c, 2, 'T1', 'MotoPartes (Tibsa CR-125)', '282120', 'CR-125 New',
-        'si', 'cr', 'si', 'HSS Ø22.2', '1800 RPM',
-        'verificado', 'conforme', 'NA', 'no_aplica',
-        '766.1', '766.0', '765.9', '', U['operario1'])
-print(f"✓ {b12.batch_code}  TUBO 22.2 x 766mm — En proceso (chaflanado 100/350)")
 
 # ══════════════════════════════════════════════════════════════════
 # 13–18. Lotes EN CANASTA (sin procesos iniciados)
