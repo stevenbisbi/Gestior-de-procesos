@@ -66,7 +66,7 @@ class ProcessShiftEntryAdmin(admin.ModelAdmin):
 class CuttingProgramLineInline(admin.TabularInline):
     model  = CuttingProgramLine
     extra  = 0
-    fields = ['product_type','pedido_quantity','total_quantity','start_date','end_date',
+    fields = ['product_type','total_quantity','start_date','end_date',
               'saw_type','rpm','client','batch']
     readonly_fields = ['batch']
 
@@ -81,7 +81,7 @@ class CuttingProgramAdmin(admin.ModelAdmin):
 
 @admin.register(CuttingProgramLine)
 class CuttingProgramLineAdmin(admin.ModelAdmin):
-    list_display    = ['program','product_type','pedido_quantity','total_quantity',
+    list_display    = ['program','product_type','total_quantity',
                        'client','saw_type','rpm','batch']
     list_filter     = ['saw_type']
     search_fields   = ['product_type__name','client','tube_description']

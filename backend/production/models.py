@@ -459,9 +459,8 @@ class CuttingProgramLine(models.Model):
     tube_description = models.CharField(max_length=300, verbose_name='Descripción tramo cortado')
 
     # Cantidades
-    # pedido_quantity = piezas pequeñas pedidas por el cliente (= total a cortar normalmente)
-    pedido_quantity   = models.IntegerField(verbose_name='Cantidad pedida (piezas)')
-    total_quantity    = models.IntegerField(verbose_name='Total a cortar (piezas)')
+    # total_quantity = piezas pedidas por el cliente (única cantidad del renglón)
+    total_quantity    = models.IntegerField(verbose_name='Cantidad pedida (piezas)')
     # tubos largos disponibles y cuántos cortes salen de cada uno
     tube_count        = models.IntegerField(null=True, blank=True, verbose_name='Tubos largos (cantidad)')
     sections_per_tube = models.IntegerField(null=True, blank=True, verbose_name='Tramos por tubo')

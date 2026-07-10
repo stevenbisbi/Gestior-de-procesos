@@ -335,9 +335,11 @@ class CuttingProgramLineViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         line = serializer.save()
         # Si cambia total_quantity y ya tiene lote, actualiza el lote
+        # y propaga la nueva cantidad a los procesos (incluso si ya iniciaron).
         if line.batch and line.batch.total_quantity != line.total_quantity:
             line.batch.total_quantity = line.total_quantity
             line.batch.save(update_fields=['total_quantity', 'updated_at'])
+            line.batch.sync_records_qty()
 
     def perform_destroy(self, instance):
         # No permitir borrar si el lote ya está en proceso o terminado
