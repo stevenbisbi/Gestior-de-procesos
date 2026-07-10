@@ -38,6 +38,73 @@ const Section = ({ title, children }) => (
   </div>
 );
 
+// ── Alta rápida: solo item/producto + cantidad; el resto se autocompleta ────
+function QuickAddLine({ program, onSaved }) {
+  const [productId, setProductId] = useState('');
+  const [product,   setProduct]   = useState(null);
+  const [qty,       setQty]       = useState('');
+  const [saving,    setSaving]    = useState(false);
+  const [err,       setErr]       = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!productId || !qty) return;
+    setSaving(true); setErr('');
+    const p      = product || {};
+    const largo  = Number(p.tube_spec_data?.original_length) || null;
+    const corte  = Number(p.cut_length) || 0;
+    const tramos = (largo && corte > 0) ? Math.floor(largo / corte) : null;
+    try {
+      await CuttingLines.create({
+        program:           program.id,
+        product_type:      Number(productId),
+        total_quantity:    Number(qty),
+        item_code:         p.item_code || '',
+        client:            p.client || '',
+        tube_description:  `${p.tube_spec_data?.label || p.name || ''} x ${p.cut_length}mm`,
+        saw_type:          (p.saw_type && p.saw_type !== 'none') ? p.saw_type : 'hss',
+        rpm:               p.rpm || null,
+        tube_length_mm:    largo,
+        sections_per_tube: tramos,
+        tube_count:        tramos ? Math.ceil(Number(qty) / tramos) : null,
+      });
+      setProductId(''); setProduct(null); setQty('');
+      onSaved();
+    } catch (ex) { setErr(ex.message); }
+    finally      { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={submit}
+      className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+      {err && <Alert type="error" onClose={() => setErr('')}>{err}</Alert>}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[260px]">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-1">
+            Item o producto
+          </span>
+          <ProductPicker value={productId} allowCreate={false}
+            onChange={(id, p) => { setProductId(id); setProduct(p); }} />
+        </div>
+        <div className="w-36">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-1">
+            Cantidad a cortar
+          </span>
+          <input className={inpCls + ' w-full'} type="number" min="1" required
+            value={qty} onChange={e => setQty(e.target.value)} placeholder="3200" />
+        </div>
+        <button type="submit" disabled={saving || !productId || !qty}
+          className="btn btn-primary px-6 py-2 disabled:opacity-40">
+          {saving ? 'Agregando…' : '➕ Agregar'}
+        </button>
+      </div>
+      <p className="text-[10px] text-slate-400 mt-2">
+        Fechas, sierra, tubos largos y demás se completan solos desde el producto — ajústalos con ✏️ si hace falta.
+      </p>
+    </form>
+  );
+}
+
 // ── Formulario inline para agregar / editar una línea ───────────────────────
 function LineForm({ program, onSave, onCancel, initial }) {
   const empty = {
@@ -298,7 +365,6 @@ export default function CuttingProgramDetail() {
   const [program,   setProgram]   = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [err,       setErr]       = useState('');
-  const [showForm,  setShowForm]  = useState(false);
   const [editLine,  setEditLine]  = useState(null);
   const [acting,    setActing]    = useState(false);
 
@@ -334,7 +400,6 @@ export default function CuttingProgramDetail() {
   };
 
   const handleSaved = () => {
-    setShowForm(false);
     setEditLine(null);
     load();
   };
@@ -380,25 +445,15 @@ export default function CuttingProgramDetail() {
                 🔒 Cerrar programa
               </button>
             )}
-            {program.status !== 'closed' && (
-              <button onClick={() => { setEditLine(null); setShowForm(v => !v); }}
-                className="btn btn-outline px-4">
-                {showForm ? 'Cancelar' : '➕ Nueva línea'}
-              </button>
-            )}
           </div>
         )}
       </div>
 
       {err && <Alert type="error" onClose={() => setErr('')}>{err}</Alert>}
 
-      {/* Formulario nueva línea */}
-      {showForm && !editLine && (
-        <LineForm
-          program={program}
-          onSave={handleSaved}
-          onCancel={() => setShowForm(false)}
-        />
+      {/* Alta rápida de línea: item + cantidad */}
+      {isSupervisor && program.status !== 'closed' && (
+        <QuickAddLine program={program} onSaved={handleSaved} />
       )}
 
       {/* Tabla de líneas */}
@@ -442,7 +497,7 @@ export default function CuttingProgramDetail() {
                       key={line.id}
                       line={line}
                       isSupervisor={isSupervisor}
-                      onEdit={l => { setShowForm(false); setEditLine(l); }}
+                      onEdit={l => setEditLine(l)}
                       onDelete={handleDelete}
                     />
                   )

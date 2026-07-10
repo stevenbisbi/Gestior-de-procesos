@@ -467,7 +467,7 @@ class CuttingProgramLine(models.Model):
     tube_length_mm    = models.FloatField(null=True, blank=True, verbose_name='Tubo largo (mm)')
 
     # Sierra
-    saw_type   = models.CharField(max_length=5, choices=SAW_CHOICES, verbose_name='Tipo sierra')
+    saw_type   = models.CharField(max_length=5, choices=SAW_CHOICES, default='hss', verbose_name='Tipo sierra')
     saw_teeth  = models.IntegerField(null=True, blank=True, verbose_name='Número de dientes')
     rpm        = models.IntegerField(null=True, blank=True, verbose_name='RPM')
 
@@ -476,7 +476,7 @@ class CuttingProgramLine(models.Model):
     advance_low  = models.FloatField(null=True, blank=True, verbose_name='Avance Low')
 
     # Comercial
-    client    = models.CharField(max_length=200, verbose_name='Cliente')
+    client    = models.CharField(max_length=200, blank=True, verbose_name='Cliente')
     packaging = models.CharField(max_length=100, blank=True, verbose_name='Embalaje')
     notes     = models.TextField(blank=True)
 
