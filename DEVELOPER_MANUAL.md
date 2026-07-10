@@ -344,8 +344,7 @@ record.finish(qty, user, ...)        == end_shift(...)
 | `pieces_per_hour` | Float |
 | `item_code` | CharField |
 | `tube_description` | CharField — tal como aparece en el documento físico ("TUB CR REDONDO 1 1/2 x 0.80 x 140mm") |
-| `pedido_quantity` | Cantidad pedida por el cliente |
-| `total_quantity` | Total a cortar (incluye demos) |
+| `total_quantity` | Cantidad pedida (única cantidad del renglón) |
 | `demo_pieces` | Cantidad de muestras |
 | `tube_count` | Cantidad de tubos largos necesarios |
 | `tube_length_mm` | Longitud del tubo largo |
@@ -770,8 +769,7 @@ Sistema de planificación mensual para las cortadoras Bewo. **Único programa ac
 | Piezas/hora | `pieces_per_hour` |
 | Item | `item_code` |
 | Descripción tramo cortado | `tube_description` (la longitud final va al final como "...x 140mm") |
-| Cantidad pedida | `pedido_quantity` |
-| Total a cortar | `total_quantity` |
+| Cantidad pedida | `total_quantity` |
 | Tramos tubo | `tube_count` |
 | Tubo largo (mm) | `tube_length_mm` |
 | Tipo sierra | `saw_type` |

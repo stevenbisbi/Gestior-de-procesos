@@ -71,8 +71,7 @@ function LineDetailModal({ line, onClose }) {
           </Section>
 
           <Section title="Cantidades">
-            <Row label="Cant. pedida"     value={line.pedido_quantity?.toLocaleString()} mono />
-            <Row label="Total a cortar"   value={line.total_quantity?.toLocaleString()}  mono />
+            <Row label="Cantidad pedida"  value={line.total_quantity?.toLocaleString()}  mono />
           </Section>
 
           <Section title="Tubo largo (materia prima)">
@@ -223,10 +222,8 @@ export default function CuttingProgramOperator() {
                     </td>
                     {/* Cantidades */}
                     <td className="py-3 px-3 text-center">
-                      <div className="text-sm font-bold text-slate-800">{line.pedido_quantity?.toLocaleString()}</div>
-                      <div className="text-[10px] text-slate-400">pedido</div>
-                      <div className="text-xs text-slate-600 mt-1">→ {line.total_quantity?.toLocaleString()}</div>
-                      <div className="text-[10px] text-slate-400">a cortar</div>
+                      <div className="text-sm font-bold text-slate-800">{line.total_quantity?.toLocaleString()}</div>
+                      <div className="text-[10px] text-slate-400">pedidas</div>
                       {line.pieces_per_hour && <div className="text-[10px] text-slate-400 mt-1">{line.pieces_per_hour} pz/h</div>}
                     </td>
                     {/* Tubo largo */}

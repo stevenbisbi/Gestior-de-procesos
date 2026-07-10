@@ -44,7 +44,7 @@ function LineForm({ program, onSave, onCancel, initial }) {
     program: program.id,
     product_type: '', start_date: '', end_date: '',
     pieces_per_hour: '', item_code: '', tube_description: '',
-    pedido_quantity: '', total_quantity: '',
+    total_quantity: '',
     tube_count: '', sections_per_tube: '', tube_length_mm: '',
     saw_type: 'hss', saw_teeth: '', rpm: '',
     advance_high: '', advance_low: '',
@@ -86,7 +86,6 @@ function LineForm({ program, onSave, onCancel, initial }) {
         ...form,
         start_date:        form.start_date || null,
         end_date:          form.end_date   || null,
-        pedido_quantity:   Number(form.pedido_quantity),
         total_quantity:    Number(form.total_quantity),
         tube_count:        num(form.tube_count),
         sections_per_tube: num(form.sections_per_tube),
@@ -138,10 +137,7 @@ function LineForm({ program, onSave, onCancel, initial }) {
         <Field label="Fecha final">
           <input className={inpCls} type="date" required value={form.end_date}   onChange={e=>set('end_date',  e.target.value)}/>
         </Field>
-        <Field label="Cant. pedida" hint="Total piezas pequeñas que necesita el cliente">
-          <input className={inpCls} type="number" min="1" required value={form.pedido_quantity} onChange={e=>set('pedido_quantity',e.target.value)}/>
-        </Field>
-        <Field label="Total a cortar" hint="Piezas que se van a cortar realmente">
+        <Field label="Cantidad pedida" hint="Piezas que se van a cortar">
           <input className={inpCls} type="number" min="1" required value={form.total_quantity}
             onChange={e => {
               const total = e.target.value;
@@ -215,10 +211,8 @@ function ProgramLineRow({ line, isSupervisor, onEdit, onDelete }) {
       </td>
       {/* Cantidades */}
       <td className="py-3 px-3 text-center">
-        <div className="text-sm font-semibold text-slate-800">{line.pedido_quantity?.toLocaleString()}</div>
-        <div className="text-[10px] text-slate-400">pedido</div>
-        <div className="text-xs text-slate-500 mt-1">→ {line.total_quantity?.toLocaleString()}</div>
-        <div className="text-[10px] text-slate-400">a cortar</div>
+        <div className="text-sm font-semibold text-slate-800">{line.total_quantity?.toLocaleString()}</div>
+        <div className="text-[10px] text-slate-400">pedidas</div>
         {line.pieces_per_hour && <div className="text-[10px] text-slate-400 mt-1">{line.pieces_per_hour} pz/h</div>}
       </td>
       {/* Tubo largo */}
