@@ -153,7 +153,15 @@ export default function CuttingProgramOperator() {
     );
   }
 
-  const lines = program?.lines || [];
+  // Agrupadas por tubo largo (forma + diámetro + espesor) para minimizar
+  // cambios de setup en la cortadora; dentro del grupo, orden de alta.
+  const tubeKey = (l) => {
+    const ts = l.product_type_data?.tube_spec_data;
+    return ts ? `${ts.shape}|${ts.outer_diameter}|${ts.thickness}` : '~';
+  };
+  const lines = [...(program?.lines || [])].sort(
+    (a, b) => tubeKey(a).localeCompare(tubeKey(b), undefined, { numeric: true })
+  );
 
   return (
     <div className="space-y-5">
@@ -208,17 +216,13 @@ export default function CuttingProgramOperator() {
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-slate-800">{line.item_code}</span>
-                        
                       </div>
                       
                     </td>  
                     {/* Producto */}
-                    <td className="py-3 px-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-slate-800">{line.product_type_data?.name}</span>
-                        
-                      </div>
-                      
+                    <td className="py-3 px-3">                   
+                        <div className="font-semibold text-slate-800">{line.tube_description}</div>
+                        <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[260px]">{line.product_type_data?.name}</div>                  
                     </td>
                     {/* Cantidades */}
                     <td className="py-3 px-3 text-center">

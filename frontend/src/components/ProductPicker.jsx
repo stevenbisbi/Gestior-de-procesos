@@ -184,7 +184,8 @@ const Field = ({ label, children, hint }) => (
    Modal — crea TubeSpec (opcional) + ProductType
    Export nombrado para reutilizarlo desde la pestaña "Lotes".
    ══════════════════════════════════════════════════════════════════════════ */
-export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, onCreated }) {
+export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onCancel, onCreated,
+                                     submitLabel = '✓ Crear y seleccionar' }) {
   // — TubeSpec —
   const [tubeMode, setTubeMode] = useState('existing'); // 'existing' | 'new'
   const [tubeId,   setTubeId]   = useState('');
@@ -322,6 +323,7 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
                       <option value="hr">HR</option>
                       <option value="cr_est">CR EST</option>
                       <option value="hr_est">HR EST</option>
+                      <option value="gv">GV</option>
                     </select>
                   </Field>
                   <Field label="Longitud original (mm)" hint="Tubo largo de fábrica">
@@ -413,7 +415,7 @@ export function CreateProductModal({ tubes, onTubeCreated, initialName = '', onC
           <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-2xl">
             <button type="button" onClick={onCancel} className="btn btn-outline px-4">Cancelar</button>
             <button type="submit" disabled={saving} className="btn btn-primary px-5">
-              {saving ? 'Creando…' : '✓ Crear y seleccionar'}
+              {saving ? 'Creando…' : submitLabel}
             </button>
           </div>
         </form>

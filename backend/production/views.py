@@ -328,12 +328,24 @@ class CuttingProgramLineViewSet(viewsets.ModelViewSet):
     )
     serializer_class = CuttingProgramLineSerializer
 
+    def _learn_from_line(self, line):
+        """
+        La referencia aprende del programa: si la línea trae piezas/hora y el
+        producto tiene otro valor (o ninguno), se guarda en el producto para
+        autocompletar la próxima vez que se programe esa referencia.
+        """
+        if line.pieces_per_hour and line.product_type.pieces_per_hour != line.pieces_per_hour:
+            line.product_type.pieces_per_hour = line.pieces_per_hour
+            line.product_type.save(update_fields=['pieces_per_hour'])
+
     def perform_create(self, serializer):
         line = serializer.save()
         line.create_batch(self.request.user)
+        self._learn_from_line(line)
 
     def perform_update(self, serializer):
         line = serializer.save()
+        self._learn_from_line(line)
         # Si cambia total_quantity y ya tiene lote, actualiza el lote
         # y propaga la nueva cantidad a los procesos (incluso si ya iniciaron).
         if line.batch and line.batch.total_quantity != line.total_quantity:

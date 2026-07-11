@@ -91,6 +91,7 @@ export default function BatchList() {
           onTubeCreated={(t) => setTubes(prev => [t, ...prev])}
           onCancel={() => setShowNewProduct(false)}
           onCreated={() => { setShowNewProduct(false); /* nada que refrescar acá */ }}
+          submitLabel="✓ Crear producto"
         />
       )}
 

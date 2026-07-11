@@ -142,6 +142,7 @@ function TodoTab() {
           onTubeCreated={(t) => setTubes(prev => [t, ...prev])}
           onCancel={() => setShowNewProduct(false)}
           onCreated={() => setShowNewProduct(false)}
+          submitLabel="✓ Crear producto"
         />
       )}
       {showNewBatch && (

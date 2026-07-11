@@ -9,7 +9,7 @@ from django.utils import timezone
 
 class TubeSpec(models.Model):
     SHAPE_CHOICES = [('round', 'Redondo'), ('square', 'Cuadrado')]
-    MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST')]
+    MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST'),('gv','GV')]
     SAW_CHOICES = [('hss','HSS'),('tct','TCT'),('none','Ninguno')]
 
     shape           = models.CharField(max_length=10, choices=SHAPE_CHOICES)
@@ -39,6 +39,10 @@ class ProductType(models.Model):
     tube_spec         = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='product_types')
     cut_length        = models.FloatField(verbose_name='Longitud de corte (mm)')
     client            = models.CharField(max_length=200, blank=True)
+    # Ritmo de corte de esta referencia. Se aprende del programa: al editar
+    # piezas/hora en una línea, el valor se guarda aquí para autocompletar
+    # las próximas veces que se programe la referencia.
+    pieces_per_hour   = models.FloatField(null=True, blank=True, verbose_name='Piezas/hora')
     default_priority  = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='media')
     requires_chaflan  = models.BooleanField(default=False)
     requires_moleteo  = models.BooleanField(default=False)

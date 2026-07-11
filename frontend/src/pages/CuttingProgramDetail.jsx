@@ -64,6 +64,7 @@ function QuickAddLine({ program, onSaved }) {
         tube_description:  `${p.tube_spec_data?.label || p.name || ''} x ${p.cut_length}mm`,
         saw_type:          (p.saw_type && p.saw_type !== 'none') ? p.saw_type : 'hss',
         rpm:               p.rpm || null,
+        pieces_per_hour:   p.pieces_per_hour || null,
         tube_length_mm:    largo,
         sections_per_tube: tramos,
         tube_count:        tramos ? Math.ceil(Number(qty) / tramos) : null,
@@ -136,6 +137,7 @@ function LineForm({ program, onSave, onCancel, initial }) {
       item_code:        f.item_code         || p.item_code || '',
       client:           f.client            || p.client,
       rpm:              f.rpm               || p.rpm,
+      pieces_per_hour:  f.pieces_per_hour   || p.pieces_per_hour || '',
       saw_type:         f.saw_type !== 'hss' ? f.saw_type : (p.saw_type !== 'none' ? p.saw_type : f.saw_type),
       tube_description: f.tube_description  || `${p.tube_spec_data?.label || ''} x ${p.cut_length}mm`,
       // ── Tubo largo (materia prima) ──
@@ -151,6 +153,7 @@ function LineForm({ program, onSave, onCancel, initial }) {
     try {
       const payload = {
         ...form,
+        code:              form.item_code || 'none',
         start_date:        form.start_date || null,
         end_date:          form.end_date   || null,
         total_quantity:    Number(form.total_quantity),
@@ -260,20 +263,52 @@ function LineForm({ program, onSave, onCancel, initial }) {
   );
 }
 
-// ── Fila de línea del programa ───────────────────────────────────────────────
-function ProgramLineRow({ line, isSupervisor, onEdit, onDelete }) {
-  const bs = BATCH_STATUS[line.batch_status] || {};
-  return (
-    <tr className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
-      {/* Fechas */}
+// ── Celda de fechas: editable en línea (guarda al cambiar) ───────────────────
+function InlineDateCell({ line, editable, onSaved }) {
+  const [saving, setSaving] = useState(false);
+  const save = async (field, value) => {
+    setSaving(true);
+    try { await CuttingLines.update(line.id, { [field]: value || null }); onSaved(); }
+    catch (e) { alert(e.message); }
+    finally   { setSaving(false); }
+  };
+  if (!editable) {
+    return (
       <td className="py-3 px-3 text-xs text-slate-600 whitespace-nowrap">
         <div>{line.start_date ? formatDate(line.start_date) : '—'}</div>
         <div className="text-slate-400">→ {line.end_date ? formatDate(line.end_date) : '—'}</div>
       </td>
+    );
+  }
+  const dateCls = 'border border-slate-200 rounded px-1.5 py-0.5 text-xs text-slate-600 bg-white ' +
+                  'focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-50 w-[120px]';
+  return (
+    <td className="py-3 px-3 whitespace-nowrap">
+      <div className="flex flex-col gap-1">
+        <input type="date" className={dateCls} disabled={saving}
+          value={line.start_date || ''} onChange={e => save('start_date', e.target.value)}
+          title="Fecha inicio" />
+        <input type="date" className={dateCls} disabled={saving}
+          value={line.end_date || ''} onChange={e => save('end_date', e.target.value)}
+          title="Fecha final" />
+      </div>
+    </td>
+  );
+}
+
+// ── Fila de línea del programa ───────────────────────────────────────────────
+function ProgramLineRow({ line, isSupervisor, programClosed, onEdit, onDelete, onSaved }) {
+  const bs = BATCH_STATUS[line.batch_status] || {};
+  return (
+    <tr className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+      {/* Item */}
+      <td className="py-3 px-3 text-xs text-slate-600 whitespace-nowrap">
+        <div>{line.item_code}</div>
+      </td>
       {/* Producto / tubo */}
       <td className="py-3 px-3">
-        <div className="font-medium text-sm text-slate-800">{line.product_type_data?.name}</div>
-        <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[260px]">{line.tube_description}</div>
+        <div className="font-medium text-sm text-slate-800">{line.tube_description}</div>
+        <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[260px]">{line.product_type_data?.name}</div>
         {line.client && <div className="text-xs text-blue-500 mt-0.5">{line.client}</div>}
       </td>
       {/* Cantidades */}
@@ -282,6 +317,8 @@ function ProgramLineRow({ line, isSupervisor, onEdit, onDelete }) {
         <div className="text-[10px] text-slate-400">pedidas</div>
         {line.pieces_per_hour && <div className="text-[10px] text-slate-400 mt-1">{line.pieces_per_hour} pz/h</div>}
       </td>
+      {/* Fechas — editables en línea por el supervisor */}
+      <InlineDateCell line={line} editable={isSupervisor && !programClosed} onSaved={onSaved} />
       {/* Tubo largo */}
       <td className="py-3 px-3 text-center text-xs text-slate-600">
         {line.tube_count ? <div><strong>{line.tube_count}</strong> tubos</div> : <span className="text-slate-300">—</span>}
@@ -409,6 +446,17 @@ export default function CuttingProgramDetail() {
 
   const ps = STATUS_PROGRAM[program.status] || {};
 
+  // Líneas agrupadas por tubo largo (forma + diámetro + espesor): las
+  // referencias del mismo tubo quedan juntas para minimizar cambios de
+  // setup en la cortadora. Dentro del grupo se respeta el orden de alta.
+  const tubeKey = (l) => {
+    const ts = l.product_type_data?.tube_spec_data;
+    return ts ? `${ts.shape}|${ts.outer_diameter}|${ts.thickness}` : '~';
+  };
+  const sortedLines = [...(program.lines || [])].sort(
+    (a, b) => tubeKey(a).localeCompare(tubeKey(b), undefined, { numeric: true })
+  );
+
   return (
     <div className="space-y-5">
       {/* Cabecera */}
@@ -469,9 +517,10 @@ export default function CuttingProgramDetail() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
-                  <th className="py-3 px-3 text-left whitespace-nowrap">Fechas</th>
+                  <th className="py-3 px-3 text-left whitespace-nowrap">Item</th>
                   <th className="py-3 px-3 text-left">Producto / Tubo</th>
                   <th className="py-3 px-3 text-center whitespace-nowrap">Cantidades</th>
+                  <th className="py-3 px-3 text-left whitespace-nowrap">Fechas</th>
                   <th className="py-3 px-3 text-center whitespace-nowrap">Tubo largo</th>
                   <th className="py-3 px-3 text-left whitespace-nowrap">Sierra</th>
                   <th className="py-3 px-3 text-center whitespace-nowrap">Avance</th>
@@ -480,10 +529,10 @@ export default function CuttingProgramDetail() {
                 </tr>
               </thead>
               <tbody>
-                {program.lines.map(line => (
+                {sortedLines.map(line => (
                   editLine?.id === line.id ? (
                     <tr key={line.id}>
-                      <td colSpan={isSupervisor ? 8 : 7} className="px-3 py-2">
+                      <td colSpan={isSupervisor ? 9 : 8} className="px-3 py-2">
                         <LineForm
                           program={program}
                           initial={editLine}
@@ -497,8 +546,10 @@ export default function CuttingProgramDetail() {
                       key={line.id}
                       line={line}
                       isSupervisor={isSupervisor}
+                      programClosed={program.status === 'closed'}
                       onEdit={l => setEditLine(l)}
                       onDelete={handleDelete}
+                      onSaved={handleSaved}
                     />
                   )
                 ))}
