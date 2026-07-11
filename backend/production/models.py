@@ -9,9 +9,13 @@ from django.utils import timezone
 
 class TubeSpec(models.Model):
     SHAPE_CHOICES = [('round', 'Redondo'), ('square', 'Cuadrado')]
-    MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST'),('gv','GV')]
+    MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST'),
+                        ('gv','GV'),('ec','EC')]
     SAW_CHOICES = [('hss','HSS'),('tct','TCT'),('none','Ninguno')]
 
+    # Código de item del tubo largo en el sistema de la empresa (ej: 349920).
+    # Identifica el tubo en almacén; puede venir vacío en tubos creados a mano.
+    item_code       = models.CharField(max_length=50, blank=True, verbose_name='Item tubo largo')
     shape           = models.CharField(max_length=10, choices=SHAPE_CHOICES)
     # CharField — admite valores fraccionados como "1/2", "5/8" o decimales "22.2"
     outer_diameter  = models.CharField(max_length=20, verbose_name='Diámetro/lado (mm)')
