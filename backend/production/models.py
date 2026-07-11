@@ -9,9 +9,13 @@ from django.utils import timezone
 
 class TubeSpec(models.Model):
     SHAPE_CHOICES = [('round', 'Redondo'), ('square', 'Cuadrado')]
-    MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST'),('gv','GV')]
+    MATERIAL_CHOICES = [('cr','CR'),('hr','HR'),('cr_est','CR EST'),('hr_est','HR EST'),
+                        ('gv','GV'),('ec','EC')]
     SAW_CHOICES = [('hss','HSS'),('tct','TCT'),('none','Ninguno')]
 
+    # Código de item del tubo largo en el sistema de la empresa (ej: 349920).
+    # Identifica el tubo en almacén; puede venir vacío en tubos creados a mano.
+    item_code       = models.CharField(max_length=50, blank=True, verbose_name='Item tubo largo')
     shape           = models.CharField(max_length=10, choices=SHAPE_CHOICES)
     # CharField — admite valores fraccionados como "1/2", "5/8" o decimales "22.2"
     outer_diameter  = models.CharField(max_length=20, verbose_name='Diámetro/lado (mm)')
@@ -39,10 +43,15 @@ class ProductType(models.Model):
     tube_spec         = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='product_types')
     cut_length        = models.FloatField(verbose_name='Longitud de corte (mm)')
     client            = models.CharField(max_length=200, blank=True)
-    # Ritmo de corte de esta referencia. Se aprende del programa: al editar
-    # piezas/hora en una línea, el valor se guarda aquí para autocompletar
-    # las próximas veces que se programe la referencia.
+    # Campos que "aprende" del programa: al crear/editar una línea con estos
+    # valores, se guardan aquí para autocompletar las próximas veces que se
+    # programe la referencia (suelen ser siempre iguales para el mismo item).
+    # saw_type y rpm no van acá: viven en el TubeSpec y se aprenden allá.
     pieces_per_hour   = models.FloatField(null=True, blank=True, verbose_name='Piezas/hora')
+    packaging         = models.CharField(max_length=100, blank=True, verbose_name='Embalaje')
+    saw_teeth         = models.IntegerField(null=True, blank=True, verbose_name='Número de dientes')
+    advance_high      = models.FloatField(null=True, blank=True, verbose_name='Avance High')
+    advance_low       = models.FloatField(null=True, blank=True, verbose_name='Avance Low')
     default_priority  = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='media')
     requires_chaflan  = models.BooleanField(default=False)
     requires_moleteo  = models.BooleanField(default=False)
