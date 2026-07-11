@@ -38,6 +38,19 @@ const Section = ({ title, children }) => (
   </div>
 );
 
+// ── Nomenclatura estándar del tramo cortado ─────────────────────────────────
+// TUB {MATERIAL} {FORMA} {Ø}x{cal}x{corte}mm — ej: TUB CR REDONDO 3/4x0.7x750mm
+const MAT_NAMES   = { cr: 'CR', hr: 'HR', cr_est: 'CR EST', hr_est: 'HR EST', gv: 'GALVANIZADO' };
+const SHAPE_NAMES = { round: 'REDONDO', square: 'CUADRADO' };
+function tramoDescription(p) {
+  const ts = p?.tube_spec_data;
+  if (!ts) return '';
+  const mat   = MAT_NAMES[ts.material] || (ts.material_display || '').toUpperCase();
+  const shape = SHAPE_NAMES[ts.shape] || '';
+  return ['TUB', mat, shape].filter(Boolean).join(' ') +
+         ` ${ts.outer_diameter}x${ts.thickness}x${p.cut_length}mm`;
+}
+
 // ── Alta rápida: solo item/producto + cantidad; el resto se autocompleta ────
 function QuickAddLine({ program, onSaved }) {
   const [productId, setProductId] = useState('');
@@ -61,10 +74,15 @@ function QuickAddLine({ program, onSaved }) {
         total_quantity:    Number(qty),
         item_code:         p.item_code || '',
         client:            p.client || '',
-        tube_description:  `${p.tube_spec_data?.label || p.name || ''} x ${p.cut_length}mm`,
+        tube_description:  tramoDescription(p) || p.name || '',
         saw_type:          (p.saw_type && p.saw_type !== 'none') ? p.saw_type : 'hss',
         rpm:               p.rpm || null,
+        // Campos que la referencia ya aprendió en programas anteriores
         pieces_per_hour:   p.pieces_per_hour || null,
+        packaging:         p.packaging || '',
+        saw_teeth:         p.saw_teeth || null,
+        advance_high:      p.advance_high ?? null,
+        advance_low:       p.advance_low ?? null,
         tube_length_mm:    largo,
         sections_per_tube: tramos,
         tube_count:        tramos ? Math.ceil(Number(qty) / tramos) : null,
@@ -137,9 +155,14 @@ function LineForm({ program, onSave, onCancel, initial }) {
       item_code:        f.item_code         || p.item_code || '',
       client:           f.client            || p.client,
       rpm:              f.rpm               || p.rpm,
+      // Campos que la referencia ya aprendió en programas anteriores
       pieces_per_hour:  f.pieces_per_hour   || p.pieces_per_hour || '',
+      packaging:        f.packaging         || p.packaging || '',
+      saw_teeth:        f.saw_teeth         || p.saw_teeth || '',
+      advance_high:     f.advance_high      || p.advance_high || '',
+      advance_low:      f.advance_low       || p.advance_low || '',
       saw_type:         f.saw_type !== 'hss' ? f.saw_type : (p.saw_type !== 'none' ? p.saw_type : f.saw_type),
-      tube_description: f.tube_description  || `${p.tube_spec_data?.label || ''} x ${p.cut_length}mm`,
+      tube_description: f.tube_description  || tramoDescription(p),
       // ── Tubo largo (materia prima) ──
       tube_length_mm:    f.tube_length_mm    || (largo ?? ''),
       sections_per_tube: f.sections_per_tube || (tramos ?? ''),
@@ -379,7 +402,7 @@ function ProgramLineRow({ line, isSupervisor, programClosed, onEdit, onDelete, o
               className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition">
               ✏️
             </button>
-            {(!line.batch_status || line.batch_status === 'in_basket') && (
+            {(!line.batch_status || ['waiting_material', 'in_basket'].includes(line.batch_status)) && (
               <button onClick={() => onDelete(line)}
                 className="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-500 transition">
                 🗑
@@ -431,7 +454,8 @@ export default function CuttingProgramDetail() {
   };
 
   const handleDelete = async (line) => {
-    if (!confirm(`¿Eliminar línea #${line.order}?`)) return;
+    const label = line.item_code || line.tube_description || `#${line.id}`;
+    if (!confirm(`¿Eliminar la línea ${label}? También se elimina su lote (si no ha iniciado).`)) return;
     try { await CuttingLines.delete(line.id); await load(); }
     catch(e) { setErr(e.message); }
   };

@@ -328,15 +328,38 @@ class CuttingProgramLineViewSet(viewsets.ModelViewSet):
     )
     serializer_class = CuttingProgramLineSerializer
 
+    # Campos de la línea que la referencia (ProductType) aprende del programa.
+    # Tubo largo (tube_count, sections_per_tube, tube_length_mm) NO se aprende:
+    # depende de la cantidad pedida o ya vive en el TubeSpec.
+    LEARN_PRODUCT_FIELDS = ['pieces_per_hour', 'packaging', 'saw_teeth',
+                            'advance_high', 'advance_low']
+    LEARN_TUBE_FIELDS    = ['saw_type', 'rpm']   # viven en el tubo largo
+
     def _learn_from_line(self, line):
         """
-        La referencia aprende del programa: si la línea trae piezas/hora y el
-        producto tiene otro valor (o ninguno), se guarda en el producto para
-        autocompletar la próxima vez que se programe esa referencia.
+        La referencia aprende del programa: los valores que suelen ser siempre
+        iguales para el mismo item (embalaje, sierra, velocidades, pz/h) se
+        guardan en el producto/tubo para autocompletar la próxima vez que se
+        programe esa referencia. Solo copia valores no vacíos.
         """
-        if line.pieces_per_hour and line.product_type.pieces_per_hour != line.pieces_per_hour:
-            line.product_type.pieces_per_hour = line.pieces_per_hour
-            line.product_type.save(update_fields=['pieces_per_hour'])
+        product = line.product_type
+        changed = [f for f in self.LEARN_PRODUCT_FIELDS
+                   if getattr(line, f) not in (None, '')
+                   and getattr(product, f) != getattr(line, f)]
+        for f in changed:
+            setattr(product, f, getattr(line, f))
+        if changed:
+            product.save(update_fields=changed)
+
+        tube = product.tube_spec
+        if tube:
+            t_changed = [f for f in self.LEARN_TUBE_FIELDS
+                         if getattr(line, f) not in (None, '')
+                         and getattr(tube, f) != getattr(line, f)]
+            for f in t_changed:
+                setattr(tube, f, getattr(line, f))
+            if t_changed:
+                tube.save(update_fields=t_changed)
 
     def perform_create(self, serializer):
         line = serializer.save()
@@ -354,11 +377,18 @@ class CuttingProgramLineViewSet(viewsets.ModelViewSet):
             line.batch.sync_records_qty()
 
     def perform_destroy(self, instance):
-        # No permitir borrar si el lote ya está en proceso o terminado
-        if instance.batch and instance.batch.status not in ('in_basket',):
+        # Se puede eliminar mientras el lote no haya iniciado producción
+        # (en un programa sin activar los lotes siguen en waiting_material).
+        batch = instance.batch
+        if batch and batch.status not in ('waiting_material', 'in_basket'):
             from rest_framework.exceptions import ValidationError
             raise ValidationError('No se puede eliminar: el lote ya inició producción.')
         instance.delete()
+        # El lote generado por esta línea no tiene sentido sin ella — se borra
+        # también para que no quede huérfano en los listados. Las recepciones
+        # de tubos asociadas quedan (SET_NULL): la canasta no pierde stock.
+        if batch:
+            batch.delete()
 
 
 # ─── Canasta de tubería (recepciones) ───────────────────

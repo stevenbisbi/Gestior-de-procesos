@@ -39,10 +39,15 @@ class ProductType(models.Model):
     tube_spec         = models.ForeignKey(TubeSpec, on_delete=models.PROTECT, related_name='product_types')
     cut_length        = models.FloatField(verbose_name='Longitud de corte (mm)')
     client            = models.CharField(max_length=200, blank=True)
-    # Ritmo de corte de esta referencia. Se aprende del programa: al editar
-    # piezas/hora en una línea, el valor se guarda aquí para autocompletar
-    # las próximas veces que se programe la referencia.
+    # Campos que "aprende" del programa: al crear/editar una línea con estos
+    # valores, se guardan aquí para autocompletar las próximas veces que se
+    # programe la referencia (suelen ser siempre iguales para el mismo item).
+    # saw_type y rpm no van acá: viven en el TubeSpec y se aprenden allá.
     pieces_per_hour   = models.FloatField(null=True, blank=True, verbose_name='Piezas/hora')
+    packaging         = models.CharField(max_length=100, blank=True, verbose_name='Embalaje')
+    saw_teeth         = models.IntegerField(null=True, blank=True, verbose_name='Número de dientes')
+    advance_high      = models.FloatField(null=True, blank=True, verbose_name='Avance High')
+    advance_low       = models.FloatField(null=True, blank=True, verbose_name='Avance Low')
     default_priority  = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='media')
     requires_chaflan  = models.BooleanField(default=False)
     requires_moleteo  = models.BooleanField(default=False)
